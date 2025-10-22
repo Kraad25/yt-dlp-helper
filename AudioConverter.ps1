@@ -41,29 +41,35 @@ function Start-AudioConverter {
         [string]$outDir
     )
 
-    $arguments = @(
+    $baseArgument = @(
         "-i", "-t", "mp3",
         "--add-metadata",
         "--no-warnings", "--quiet",
         "-o", "$outDir\%(title)s.%(ext)s"
     )
-    $arguments += $url
-    $arg2 ="--extractor-args", "youtube:player_js_version=actual"
-    $arg3 = "--extractor-args", "youtube:player_client=default,web_safari;player_js_version=actual"
+    $baseArgument += $url
 
-    if(-not(Start-RunYtDlp($arguments))){
-        Write-Error "Base argument did not execute successfully, trying next arguments!"
-        $arguments += $arg2
-        if(-not(Start-RunYtDlp($arguments))){
-            Write-Error "Argument set 2 did not execute successfully, trying next arguments!"
-            $arguments = $arguments | Where-Object { $arg2 -notcontains $_ }
-            $arguments += $arg3
-            if(-not(Start-RunYtDlp($arguments))){
-                Write-Error "Close it and go home nothing working!"
-            }
+    $retryStages = @(
+        @{Name = "Base"; Args = $baseArgument},
+        @{Name = "PlayerJSVersion"; Args = $baseArgument + @("--extractor-args", "youtube:player_js_version=actual")},
+        @{Name = "PlayerClientAndJSVersion"; Args = $baseArgument + @("--extractor-args", "youtube:player_client=default,web_safari;player_js_version=actual")}
+    )
+
+    foreach ($stage in $retryStages) {
+        Write-Host "Attempting stage: $($stage.Name)"
+        if (Start-RunYtDlp -arguments $stage.Args) {
+            Write-Host "Stage $($stage.Name) succeeded."
+            return
+        } else {
+            Write-Error "Stage $($stage.Name) failed."
         }
     }
+
+    Write-Error "All stages failed. Unable to download audio."
 }
+
+
+
 
 if (-not (Test-Path $jsonFile)) {
     Write-Error "JSON input file not found: $jsonFile"
@@ -75,4 +81,5 @@ $jsonContent = Get-Content $jsonFile -Raw | ConvertFrom-Json
 $url = $jsonContent.Url
 $outDir = $jsonContent.FolderName
 
+Confirm-Directory -path $outDir
 Start-AudioConverter -url $url -outDir $outDir
