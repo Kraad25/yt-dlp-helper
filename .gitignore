@@ -4,3 +4,5 @@
 *.ffpreset
 *.txt
 *.exe
+
+!requirements.txt
