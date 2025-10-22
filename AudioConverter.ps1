@@ -1,3 +1,7 @@
+param (
+    [string]$jsonFile
+)
+
 function Confirm-Directory {
     param([string]$path)
     if (-not (Test-Path $path)) {
@@ -60,3 +64,15 @@ function Start-AudioConverter {
         }
     }
 }
+
+if (-not (Test-Path $jsonFile)) {
+    Write-Error "JSON input file not found: $jsonFile"
+    exit 1
+}
+
+$jsonContent = Get-Content $jsonFile -Raw | ConvertFrom-Json
+
+$url = $jsonContent.Url
+$outDir = $jsonContent.FolderName
+
+Start-AudioConverter -url $url -outDir $outDir
