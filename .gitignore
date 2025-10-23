@@ -4,5 +4,9 @@
 *.ffpreset
 *.txt
 *.exe
+*.mp3
+*.mp4
+*.part
+*.ytdl
 
 !requirements.txt

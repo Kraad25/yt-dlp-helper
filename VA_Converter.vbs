@@ -1,12 +1,13 @@
 Option Explicit
 
-Dim fso, shell, scriptDir, jsonFile, psScript
+Dim fso, shell, scriptDir, jsonFile, psScript, taggerScript
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
 
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 jsonFile = scriptDir & "\input.json"
 psScript = scriptDir & "\AudioConverter.ps1"
+taggerScript = scriptDir & "\AudioTagger.ps1"
 
 Function GetUserInput()
     Dim data
@@ -52,4 +53,22 @@ Function DownloadAudio()
     End If
 End Function
 
+Function CleanData()
+    Dim command, exitCode
+    If Not fso.FileExists(taggerScript) Then
+        MsgBox "Tagger.ps1 not found! Please place it in the same folder.", vbCritical, "Error"
+        Exit Function
+    End If
+
+    command = "powershell -NoProfile -ExecutionPolicy Bypass -NoExit -File """ & taggerScript & """ """ & jsonFile & """"
+    exitCode = shell.Run(command, 1, True)
+
+    If exitCode = 0 Then
+        MsgBox "Metadata cleaned and updated successfully!", 64, "Tagging Complete"
+    Else
+        MsgBox "Metadata update failed. Exit code: " & exitCode, vbCritical, "Error"
+    End If
+End Function
+
 DownloadAudio
+CleanData
