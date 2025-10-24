@@ -61,18 +61,18 @@ function Start-AudioConverter {
             Write-Host "Stage $($stage.Name) succeeded."
             return
         } else {
-            Write-Error "Stage $($stage.Name) failed."
+            Write-Warning "Stage $($stage.Name) failed."
         }
     }
 
-    Write-Error "All stages failed. Unable to download audio."
+    Write-Warning "All stages failed. Unable to download audio."
 }
 
 
 
 
 if (-not (Test-Path $jsonFile)) {
-    Write-Error "JSON input file not found: $jsonFile"
+    Write-Warning "JSON input file not found: $jsonFile"
     exit 1
 }
 

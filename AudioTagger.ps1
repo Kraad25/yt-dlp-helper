@@ -2,6 +2,62 @@ param (
     [string]$jsonFile
 )
 
+function Remove-BracketedContent {
+    param([string]$Text)
+    if (-not $Text) { return $null }
+
+    $Text -replace '\[[^\]]*\]', '' -replace '\([^\)]*\)', '' | ForEach-Object { $_.Trim() }
+}
+
+function Split-TitleByParts {
+    param([string]$Title)
+    if (-not $Title) { return @() } 
+
+    # Split by dash or pipe and trim whitespace
+    return ($Title -split '\s*[-|]\s*' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Remove-NamePart {
+    param(
+        [string]$Part,
+        [string]$NameToRemove
+    )
+    if (-not $NameToRemove) { return $Part }
+
+    # Case-insensitive exact match
+    if ($Part.Trim().ToLower() -eq $NameToRemove.Trim().ToLower()) {
+        return $null
+    }
+
+    return $Part
+}
+
+function Start-FFmpegProcess {
+    param([string[]]$Arguments)
+
+    $process = Start-Process -FilePath 'ffmpeg' -ArgumentList $Arguments `
+        -NoNewWindow -Wait -PassThru
+
+    return $process
+}
+
+function Use-FFmpegResult {
+    param(
+        [System.Diagnostics.Process]$Process,
+        [string]$TempFile,
+        [string]$OriginalFile
+    )
+
+    if ($Process.ExitCode -eq 0) {
+        Move-Item -Force -Path $TempFile -Destination $OriginalFile
+        Write-Host "Metadata updated: $([System.IO.Path]::GetFileName($OriginalFile))"
+    }
+    else {
+        Write-Warning "ffmpeg failed for: $OriginalFile (exit code $($Process.ExitCode))"
+        if (Test-Path $TempFile) { Remove-Item $TempFile -Force }
+    }
+}
+
 function Get-CleanTitle {
     param (
         [string]$fileName,
@@ -11,33 +67,18 @@ function Get-CleanTitle {
     
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
 
-    $cleaned = $baseName -replace '\[[^\]]*\]', '' -replace '\([^\)]*\)', ''
-    $cleaned = $cleaned.Trim()
-
-    $parts = $cleaned -split '\s*[-|]\s*' | ForEach-Object { $_.Trim() }
-
-    $filtered = @()
-    foreach ($p in $parts) {
-        if (-not [string]::IsNullOrWhiteSpace($p)) {
-            $lower = $p.ToLower()
-            $isArtist = $false
-            $isAlbum = $false
-
-            if ($artist -and ($lower -eq $artist.ToLower())) { $isArtist = $true }
-            if ($album -and ($lower -eq $album.ToLower())) { $isAlbum = $true }
-
-            if (-not ($isArtist -or $isAlbum)) {
-                $filtered += $p
-            }
-        }
+    $cleanName = Remove-BracketedContent -Text $baseName
+    $parts = Split-TitleByParts -Title $cleanName
+    $filteredParts = foreach ($part in $parts) {
+        $p = Remove-NamePart $part $Artist
+        $p = Remove-NamePart $p $Album
+        if ($p) { $p }  # keep non-empty parts
     }
 
-    if ($filtered.Count -eq 0) {
-        return $cleaned.Trim()
+    if (-not $filteredParts -or $filteredParts.Count -eq 0) {
+        return $cleanName.Trim()
     }
-
-    $cleanTitle = $filtered[0].Trim()
-    return $cleanTitle
+    return ($filteredParts -join ' - ').Trim()
 }
 
 function Update-Metadata {
@@ -57,17 +98,10 @@ function Update-Metadata {
 
     $arguments = @('-i', "`"$filePath`"", '-y', '-id3v2_version', '3', '-write_id3v1', '1') + $metaArgs + @('-codec', 'copy', "`"$tempFile`"")
 
-    $process = Start-Process -FilePath 'ffmpeg' -ArgumentList $arguments -NoNewWindow -Wait -PassThru
-
-    if ($process.ExitCode -eq 0) {
-        Move-Item -Force -Path $tempFile -Destination $filePath
-        Write-Host "Metadata updated: $([System.IO.Path]::GetFileName($filePath))"
-    }
-    else {
-        Write-Warning "ffmpeg failed to update: $filePath"
-        if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
-    }
+    $process =Start-FFmpegProcess -Arguments $arguments
+    Use-FFmpegResult -Process $process -TempFile $tempFile -OriginalFile $filePath
 }
+
 
 
 if (-not (Test-Path $jsonFile)) {
