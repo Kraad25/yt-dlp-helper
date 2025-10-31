@@ -9,6 +9,7 @@ function Confirm-Directory {
     }
 }
 
+
 function Get-YtDlpPath {
     try {
         & yt-dlp --version > $null 2>&1
@@ -50,9 +51,9 @@ function Start-AudioConverter {
     $baseArgument += $url
 
     $retryStages = @(
-        @{Name = "Base"; Args = $baseArgument},
         @{Name = "PlayerJSVersion"; Args = $baseArgument + @("--extractor-args", "youtube:player_js_version=actual")},
-        @{Name = "PlayerClientAndJSVersion"; Args = $baseArgument + @("--extractor-args", "youtube:player_client=default,web_safari;player_js_version=actual")}
+        @{Name = "PlayerClientAndJSVersion"; Args = $baseArgument + @("--extractor-args", "youtube:player_client=default,web_safari;player_js_version=actual")},
+        @{Name = "Base"; Args = $baseArgument}
     )
 
     foreach ($stage in $retryStages) {

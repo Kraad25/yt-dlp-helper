@@ -8,5 +8,6 @@
 *.mp4
 *.part
 *.ytdl
+*.jpg
 
 !requirements.txt
