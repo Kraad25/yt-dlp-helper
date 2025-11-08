@@ -9,5 +9,6 @@
 *.part
 *.ytdl
 *.jpg
+*.pyc
 
 !requirements.txt
