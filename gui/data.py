@@ -1,11 +1,14 @@
 class Data:
     def __init__(self):
-        pass
+        self.beige = "#F5F5DC"
+        self.light_beige = "#FAF3E0"
+        self.dark_beige = "#EDE0C8"
+        self.grey = "#c0c0c0"
 
     def get_background_color(self):
-        return "#EDE0C8" # Beige->#F5F5DC, Light Beige->#FAF3E0, Dark Beige->#EDE0C8
+        return self.dark_beige
     def get_secondary_color(self):
-        return "#c0c0c0"
+        return self.grey
 
     def get_window_placement(self, root):
         window_placement_x = int(root.winfo_screenwidth()*0.3)

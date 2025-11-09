@@ -2,10 +2,12 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 
 from data import Data
+from folderManger import FolderManager
 
 class HomeScreen(ttk.Frame):
     def __init__(self, parent, app):
         self.data = Data()
+        self.folderManager = FolderManager()
 
         style = ttk.Style()
         style.configure("Beige.TFrame", background=self.data.get_background_color())
@@ -41,6 +43,7 @@ class HomeScreen(ttk.Frame):
         folder_label.place(x=30, y=120)
         self.folder_entry = ttk.Entry(self, width=70)
         self.folder_entry.place(x=85, y=120)
+        self.folder_entry.bind("<Return>", self._on_folder_enter)
 
         browse_button = tk.Button(self, text="📁", font=("Arial", 12), padx=1, pady=1, bd=0, command=lambda:self._browse_folder(self.folder_entry))
         browse_button.place(x=520, y=116)
@@ -67,7 +70,6 @@ class HomeScreen(ttk.Frame):
         self.status_label = ttk.Label(self, text="Status: Idle", background=self.data.get_background_color(), font=("Segoe UI", 12, "italic"))
         self.status_label.place(x=230, y=450)
 
-
     def _setup_mode_frame(self):
         mode_frame = tk.LabelFrame(self,                                                
                                     text="Metadata (Optional)",
@@ -91,10 +93,17 @@ class HomeScreen(ttk.Frame):
         ttk.Label(frame, text="Album :", background=self.data.get_secondary_color()).place(x=20, y=60)
         ttk.Entry(frame, width=65).place(x=70, y=60)
 
-    
+    def _on_folder_enter(self, event):
+        folder_name = self.folder_entry.get().strip()
+        self.folderManager.set_folder_name(folder_name)
+        
+
     def _browse_folder(self, folder_entry):
-        folder = filedialog.askdirectory(initialdir="/", title="Choose Folder")
-        if folder:
-            self.base_dir = folder
+        try:
+            folder = self.folderManager.browse_folder()
             folder_entry.delete(0, tk.END)
-            folder_entry.insert(0, f"{self.base_dir}")
+            folder_entry.insert(0, folder)
+        except Exception as e:
+            folder = self.folderManager.get_full_path()
+            folder_entry.delete(0, tk.END)
+            folder_entry.insert(0, folder)
