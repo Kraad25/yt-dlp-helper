@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk
 
 from data import Data
 from folderManger import FolderManager
@@ -8,6 +8,7 @@ class HomeScreen(ttk.Frame):
     def __init__(self, parent, app):
         self.data = Data()
         self.folderManager = FolderManager()
+        self.app = app
 
         style = ttk.Style()
         style.configure("Beige.TFrame", background=self.data.get_background_color())
@@ -17,7 +18,6 @@ class HomeScreen(ttk.Frame):
         
         super().__init__(parent, style="Beige.TFrame")
         self.mode_var = tk.IntVar(value=1)  # Default to Mp3
-        self.base_dir = "/"
 
         self._setup_ui()
 
@@ -60,7 +60,7 @@ class HomeScreen(ttk.Frame):
         download_button = ttk.Button(self, text="Download", width=20)
         download_button.place(x=125, y=525)
 
-        metadata_button = ttk.Button(self, text="Edit Metadata", width=20)
+        metadata_button = ttk.Button(self, text="Edit Metadata", width=20, command=lambda:self.app.switch_frame(self.app.editor))
         metadata_button.place(x=300, y=525)
 
     def _setup_status_progress_bar(self):
@@ -99,11 +99,9 @@ class HomeScreen(ttk.Frame):
         
 
     def _browse_folder(self, folder_entry):
-        try:
-            folder = self.folderManager.browse_folder()
-            folder_entry.delete(0, tk.END)
-            folder_entry.insert(0, folder)
-        except Exception as e:
+        folder = self.folderManager.browse_folder()
+        if not folder:
             folder = self.folderManager.get_full_path()
-            folder_entry.delete(0, tk.END)
-            folder_entry.insert(0, folder)
+        
+        folder_entry.delete(0, tk.END)
+        folder_entry.insert(0, folder)

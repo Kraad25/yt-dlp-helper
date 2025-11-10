@@ -2,6 +2,7 @@ import tkinter as tk
 
 from data import Data
 from homeScreen import HomeScreen
+from metadataEditor import MetadataEditor
 
 class Application:
     def __init__(self):
@@ -15,8 +16,11 @@ class Application:
         self.root.configure(background=data.get_background_color())
         self._create_menu_bar()
 
-        self.current_screen = None
         self._load_frames()
+        self.switch_frame(self.editor)
+    
+    def switch_frame(self, new_frame):
+        new_frame.tkraise()
 
     def run(self):
         self.root.mainloop()
@@ -36,13 +40,12 @@ class Application:
 
     def _load_frames(self):
         self.home = HomeScreen(self.root, self)
+        self.editor = MetadataEditor(self.root, self)
 
-        for frame in (self.home, ):
+        for frame in (self.home, self.editor):
             frame.place(x=0, y=0, width=560, height=600)
             frame.pack_propagate(False)
 
-    def _switch_frame(self, new_frame):
-        new_frame.tkraise()
 
     def _about(self):
         pass

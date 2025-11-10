@@ -16,6 +16,10 @@ class FolderManager:
     
     def set_folder_name(self, folder_name):
         self.folder_name = folder_name.strip()
+        if os.path.isabs(self.folder_name):
+            self.folder_name = os.path.basename(self.folder_name)
+        else:
+            self.folder_name = folder_name
     
     def get_full_path(self):
         base_dir = self._get_base_dir()
