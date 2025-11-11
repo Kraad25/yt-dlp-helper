@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-class Entries:
+class CustomEntry:
     def __init__(self, parent, width, posx=0, posy=0):
         self.parent = parent
         self.width = width

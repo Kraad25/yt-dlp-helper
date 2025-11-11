@@ -10,5 +10,6 @@
 *.ytdl
 *.jpg
 *.pyc
+*.bat
 
 !requirements.txt
