@@ -19,7 +19,7 @@ class Application:
 
         self._setup_window()
         self._create_views()
-        self._show_home_view()
+        self.show_metdata()
 
     def _setup_window(self):
         self.root.title("Youtube Converter")
@@ -67,8 +67,15 @@ class Application:
         if self.home_view:
             self.show_view(self.home_view)
 
+    def _show_metadata_view(self):
+        if self.metadata_view:
+            self.show_view(self.metadata_view)
+
     def show_home(self):
         self._show_home_view()
+
+    def show_metdata(self):
+        self._show_metadata_view()
 
     def _show_about(self):
         pass
@@ -78,8 +85,17 @@ class Application:
     def on_download_requested(self):
         pass
 
-    def on_metadata_edit_requested(self):
+    def on_metadata_edit_requested(self, data):
+        folder_path = self.folder_model.get_full_path()
+        artist = data.get("artist", "")
+        album = data.get("album", "")
+
+        self.metadata_view.set_folder_path(folder_path)
+        self.metadata_view.set_artist(artist)
+        self.metadata_view.set_album(album)
+
         self.show_view(self.metadata_view)
+
 
     def on_browse_folder_requested(self):
         folder = self.folder_model.browse_folder()

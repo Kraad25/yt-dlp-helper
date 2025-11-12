@@ -150,7 +150,8 @@ class HomeView(BaseView):
     
 
     def _on_metadata_clicked(self):
-        self.notify_controller("on_metadata_edit_requested")
+        data = self.get_form_data()
+        self.notify_controller("on_metadata_edit_requested", data=data)
 
     def _on_browse_clicked(self):
         self.notify_controller("on_browse_folder_requested")
