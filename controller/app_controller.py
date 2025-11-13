@@ -1,10 +1,13 @@
 import tkinter as tk
 from tkinter import ttk
 
+from view.theme import AppTheme
 from view.home_view import HomeView
 from view.metadata_view import MetadataView
-from view.theme import AppTheme
+
 from model.folder_model import FolderModel
+
+from controller.download_controller import DownloadController
 
 class Application:
     def __init__(self):
@@ -19,7 +22,8 @@ class Application:
 
         self._setup_window()
         self._create_views()
-        self.show_metdata()
+        self._initialize_controllers()
+        self.show_home()
 
     def _setup_window(self):
         self.root.title("Youtube Converter")
@@ -59,6 +63,9 @@ class Application:
             view.place(x=0, y=0, width=560, height=600)
             view.pack_propagate(False)
 
+    def _initialize_controllers(self):
+        self.downloadController = DownloadController(self.home_view)
+
     def show_view(self, view: ttk.Frame):
         self.current_view = view
         view.tkraise()
@@ -74,16 +81,18 @@ class Application:
     def show_home(self):
         self._show_home_view()
 
-    def show_metdata(self):
+    def show_metadata(self):
         self._show_metadata_view()
 
     def _show_about(self):
         pass
 
     # Event Handlers
-
-    def on_download_requested(self):
-        pass
+    def on_download_requested(self, data):
+        folder = data.get("folder", "")
+        self.folder_model.set_folder_name(folder_name=folder)
+        path = self.folder_model.get_full_path()
+        self.downloadController.download_requested(data, path)
 
     def on_metadata_edit_requested(self, data):
         folder_path = self.folder_model.get_full_path()

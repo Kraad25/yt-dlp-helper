@@ -15,7 +15,7 @@ class FolderModel:
             return self.get_full_path()  
         return None
     
-    def set_folder_name(self, folder_name):
+    def set_folder_name(self, folder_name: str):
         folder_name = folder_name.strip()
         if os.path.isabs(folder_name):
             self._folder_name = os.path.basename(folder_name)
@@ -30,7 +30,7 @@ class FolderModel:
     def get_base_directory(self):
         return self.config.get("base_dir", "/")
     
-    def set_base_directory (self, path):
+    def set_base_directory (self, path: str):
         self.config["base_dir"] = path
         self._save_config()
 

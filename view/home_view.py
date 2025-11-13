@@ -18,6 +18,7 @@ class HomeView(BaseView):
         self.progress_bar = None
         self.status_entry = None
 
+        self.root = parent
         super().__init__(parent, controller)
 
 
@@ -144,9 +145,8 @@ class HomeView(BaseView):
     # Event Handlers
 
     def _on_download_clicked(self):
-        print("You have Clicked Downlaod")
-        # data = self.get_form_data()
-        # self.notify_controller("on_download_requested", data=data)
+        data = self.get_form_data()
+        self.notify_controller("on_download_requested", data=data)
     
 
     def _on_metadata_clicked(self):
