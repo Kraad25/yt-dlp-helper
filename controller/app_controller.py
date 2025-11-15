@@ -8,6 +8,7 @@ from view.metadata_view import MetadataView
 from model.folder_model import FolderModel
 
 from controller.download_controller import DownloadController
+from controller.metadata_controller import MetadataController
 
 class Application:
     def __init__(self):
@@ -65,6 +66,7 @@ class Application:
 
     def _initialize_controllers(self):
         self.downloadController = DownloadController(self.home_view)
+        self.metadataController = MetadataController(self.metadata_view)
 
     def show_view(self, view: ttk.Frame):
         self.current_view = view
@@ -114,6 +116,25 @@ class Application:
 
     def on_folder_name_provided(self, name):
         self.folder_model.set_folder_name(name)
+
+    def start_editing_requested(self, data):
+        folder_path = data.get("folder_path", "")
+        artist = data.get("artist", "")
+        album = data.get("album", "")
+        self.metadataController.editing_started(folder_path, artist, album)
+
+    def on_next(self, data):
+        title = data.get("title", "")
+        self.metadataController.on_next(title)
+
+    def on_back(self, data):
+        title = data.get("title", "")
+        self.metadataController.on_back(title)
+
+    def on_finish(self, data):
+        title = data.get("title", "")
+        type = data.get("filename_type", "")
+        self.metadataController.on_finish(title, type)
 
     def on_home_requested(self):
         self.show_home()

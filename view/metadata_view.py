@@ -9,7 +9,7 @@ from view.custom_entry import CustomEntry
 class MetadataView(BaseView):
     def __init__(self, parent: tk.Widget, controller: Optional[None]):
         self.theme = AppTheme()
-        self._filename_var = tk.IntVar(value=1)
+        self.filename_var = tk.IntVar(value=1)
 
         self.folder_path_entry = None
         self.artist_entry = None
@@ -17,6 +17,7 @@ class MetadataView(BaseView):
         self.progress_bar = None
         self.status_entry = None
 
+        self.root = parent
         super().__init__(parent, controller)
 
 
@@ -34,7 +35,7 @@ class MetadataView(BaseView):
         self._show_presets()
         self._show_filenaming_options()
         self._show_editing_field()
-        self._create_action_buttons()
+        self._show_progess_state()
 
     def _bind_events(self):
         pass
@@ -74,21 +75,21 @@ class MetadataView(BaseView):
 
         title_artist = tk.Radiobutton(self,
                                       text="Title - Artist", 
-                                      variable=self._filename_var, 
+                                      variable=self.filename_var, 
                                       value=1, 
                                       bg=self.theme.get_background_color(), 
                                       activebackground=self.theme.get_background_color()
                                     )
         title_album = tk.Radiobutton(self,
                                      text="Title - Album", 
-                                     variable=self._filename_var, 
+                                     variable=self.filename_var, 
                                      value=2, 
                                      bg=self.theme.get_background_color(), 
                                      activebackground=self.theme.get_background_color()
                                 )
         title = tk.Radiobutton(self,
                                text="Title", 
-                               variable=self._filename_var,
+                               variable=self.filename_var,
                                value=3, 
                                bg=self.theme.get_background_color(), 
                                activebackground=self.theme.get_background_color()
@@ -112,19 +113,49 @@ class MetadataView(BaseView):
         editing_frame.pack_propagate(False)
 
         file_label = ttk.Label(editing_frame, text="Title :", font=("Helvetica", 11), background=self.theme.get_secondary_color())
-        file_label.place(x=50, y=20)
+        file_label.place_forget()
         self.title_entry = CustomEntry(editing_frame, 50, 90, 20)
-        self.title_entry.make_entry()
+        
+        self.back_button = ttk.Button(editing_frame, text="Back", command=lambda:self._on_back_clicked())
+        self.back_button.place_forget()
+        self.next_button = ttk.Button(editing_frame, text="Next", command=lambda:self._on_next_clicked())
+        self.next_button.place_forget()
+        finish_button = ttk.Button(editing_frame, text="Finish Editing", command=lambda:self._on_finish_clicked())
+        finish_button.place_forget()
 
-        back_button = ttk.Button(editing_frame, text="Back", command=lambda:None)
-        back_button.place(x=210, y=90)
-        next_button = ttk.Button(editing_frame, text="Next", command=lambda:None)
-        next_button.place(x=310, y=90)
+        self.data = {"back": self.back_button,
+                     "next": self.next_button,
+                     "finish": finish_button,
+                     "label": file_label,
+                     "title_entry": self.title_entry
+                    }
+        
+        self.start_button = ttk.Button(editing_frame, 
+                                  text="Start Editing", 
+                                  command=lambda: self._on_start_editing_clicked()
+                                )
+        self.start_button.place(x=200, y=90)
 
-    def _create_action_buttons(self):
-        start_editing_button = ttk.Button(self, text="Start Editing", width=20, command=lambda: self._on_metadata_clicked())
-        start_editing_button.place(x=200, y=525)
+    def _show_progess_state(self):
+        ttk.Label(self, 
+                  text="Status: ", 
+                  background=self.theme.get_background_color(), 
+                  font=("Segoe UI", 12, "italic")
+                ).place(x=180, y=500)
+        self.status_entry = CustomEntry(self, width=20, posx=230, posy=503)
+        self.status_entry.make_entry()
 
+    def _get_data(self):
+        return {"title": self.title_entry.get_entry_text(),
+                "filename_type": self.filename_var
+            }
+    
+    def _get_preset_data(self):
+        return {"folder_path": self.folder_path_entry.get_entry_text(),
+                "artist" : self.artist_entry.get_entry_text(),
+                "album": self.album_entry.get_entry_text()
+                }
+    
     # Public Methods
     def set_folder_path(self, folder_path):
         self.folder_path_entry.set_entry_text(folder_path)
@@ -135,6 +166,46 @@ class MetadataView(BaseView):
     def set_album(self, album):
         self.album_entry.set_entry_text(album)
 
+    def set_title(self, title):
+        self.title_entry.set_entry_text(title)
+
+    def set_next_enabled(self, enabled: bool):
+        state = tk.NORMAL if enabled else tk.DISABLED
+        self.next_button.config(state=state)
+
+    def set_back_enabled(self, enabled: bool):
+        state = tk.NORMAL if enabled else tk.DISABLED
+        self.back_button.config(state=state)
+
+    def update_status(self, status):
+        self.status_entry.set_entry_text(status)
+
+    def start_editing_success(self):
+        self.start_button.place_forget()
+
+        self.data["label"].place(x=50, y=20)
+        self.data["title_entry"].make_entry()
+        self.data["back"].place(x=110, y=90)
+        self.data["next"].place(x=210, y=90)
+        self.data["finish"].place(x=310, y=90)
+
+
     # Event Handler
     def _on_home_clicked(self):
         self.notify_controller("on_home_requested")
+
+    def _on_start_editing_clicked(self):      
+        data = self._get_preset_data()
+        self.notify_controller("start_editing_requested", data=data)
+
+    def _on_next_clicked(self):
+        data = self._get_data()
+        self.notify_controller("on_next", data=data)
+
+    def _on_back_clicked(self):
+        data = self._get_data()
+        self.notify_controller("on_back", data=data)
+
+    def _on_finish_clicked(self):
+        data = self._get_data()
+        self.notify_controller("on_finish", data=data)
