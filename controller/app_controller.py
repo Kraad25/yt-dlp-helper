@@ -105,6 +105,8 @@ class Application:
         self.metadata_view.set_artist(artist)
         self.metadata_view.set_album(album)
 
+        self.metadata_view.reset_wizard_state()
+
         self.show_view(self.metadata_view)
 
 
@@ -117,7 +119,7 @@ class Application:
     def on_folder_name_provided(self, name):
         self.folder_model.set_folder_name(name)
 
-    def start_editing_requested(self, data):
+    def on_start_editing(self, data):
         folder_path = data.get("folder_path", "")
         artist = data.get("artist", "")
         album = data.get("album", "")

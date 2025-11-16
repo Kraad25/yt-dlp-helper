@@ -11,7 +11,6 @@ class MetadataController:
         self.current_index = 0
         self.artist = ""
         self.album = ""
-        self.filename_type = None
         self.folder_path = ""
 
     def editing_started(self, folder_path, artist, album):
@@ -31,55 +30,52 @@ class MetadataController:
         self.view.start_editing_success()
 
         self.current_index=0
-        self.file_name = self.files[self.current_index]
-        self.file_path = os.path.join(self.folder_path, self.file_name)
+        file_name, file_path = self._get_current_file_info()
 
-        title = self.metadataModel.get_title(self.file_path)
+        title = self.metadataModel.get_title(file_path)
         self.view.set_title(title if title else "")  
-        self.view.update_status(f"Editing: {self.file_name}")
+        self.view.update_status(f"Editing: {file_name}")
 
         self.view.set_back_enabled(False)
         self.view.set_next_enabled(len(self.files)>1)
 
-    def on_next(self, title):
-        self.metadataModel.set_metadata(self.file_path, title, self.artist, self.album)
-        self.view.update_status(f"Saved: {self.file_name}")
+    def on_next(self, given_title):
+        file_name, file_path = self._get_current_file_info()
+        success = self.metadataModel.set_metadata(file_path, given_title, self.artist, self.album)
+        
+        if success:
+            self.view.update_status(f"Saved: {file_name}")
+        else:
+            self.view.update_status(f"Failed to save metadata for {file_name}")
+        
+        self._navigate_to_file(self.current_index + 1)
 
-        if self.current_index<len(self.files) - 1:
-            self.current_index += 1
-            self.file_name = self.files[self.current_index]
-            self.file_path = os.path.join(self.folder_path, self.file_name)
+    def on_back(self, given_title):
+        file_name, file_path = self._get_current_file_info()
+        success = self.metadataModel.set_metadata(file_path, given_title, self.artist, self.album)
 
-            title = self.metadataModel.get_title(self.file_path)
-            self.view.set_title(title if title else "")
-            self.view.update_status(f"Editing: {self.file_name}")
+        if success:
+            self.view.update_status(f"Saved: {file_name}")
+        else:
+            self.view.update_status(f"Failed to save metadata for {file_name}")
 
-        self.view.set_back_enabled(self.current_index>0)
-        self.view.set_next_enabled(self.current_index < len(self.files) - 1)
+        self._navigate_to_file(self.current_index - 1)
 
-    def on_back(self, title):
-        self.metadataModel.set_metadata(self.file_path, title, self.artist, self.album)
-        self.view.update_status(f"Saved: {self.file_name}")
+    def on_finish(self, given_title, type):
+        file_name, file_path = self._get_current_file_info()
+        success = self.metadataModel.set_metadata(file_path, given_title, self.artist, self.album)
 
-        if self.current_index > 0:
-            self.current_index -= 1
-            self.file_name = self.files[self.current_index]
-            self.file_path = os.path.join(self.folder_path, self.file_name)
-
-            title = self.metadataModel.get_title(self.file_path)
-            self.view.set_title(title if title else "")
-            self.view.update_status(f"Editing: {self.file_name}")
-
-        self.view.set_back_enabled(self.current_index > 0)
-        self.view.set_next_enabled(self.current_index < len(self.files) - 1)
-
-
-    def on_finish(self, title, type):
-        self.metadataModel.set_metadata(self.file_path, title, self.artist, self.album)
-        self.view.update_status(f"Saved: {self.file_name}")
+        if success:
+            self.view.update_status(f"Saved: {file_name}")
+        else:
+            self.view.update_status(f"Failed to save metadata for {file_name}")
+            return
 
         self._rename_files(type)
-        self.view.update_status("Renaming Completed")
+        
+        self.view.set_back_enabled(False)
+        self.view.set_next_enabled(False)
+        self.view.update_status("Editing complete! Go back to home to start over.")
 
     def _contains_subfolders(self, folder_path):
         for f in os.listdir(folder_path):
@@ -93,15 +89,35 @@ class MetadataController:
             f for f in os.listdir(folder_path)
             if os.path.isfile(os.path.join(folder_path, f)) and f.lower().endswith('.mp3')
         ]
+    
+    def _get_current_file_info(self):
+        file_name = self.files[self.current_index]
+        file_path = os.path.join(self.folder_path, file_name)
+        return file_name, file_path
+    
+    def _navigate_to_file(self, new_index):
+        if not (0 <= new_index < len(self.files)):
+            return # Outta bounds
+        self.current_index= new_index
+        self.file_name, self.file_path = self._get_current_file_info()
 
-    def _show_current_file_title(self, file_path):
-        title = self.metadataModel.get_title()
-        self.view.update_status("Editing")
+        title = self.metadataModel.get_title(self.file_path)
+        self.view.set_title(title if title else "")
+        self.view.update_status(f"Editing: {self.file_name}")
+        self._update_navigation_button_states()
+
+    def _update_navigation_button_states(self):
+        self.view.set_back_enabled(self.current_index > 0)
+        self.view.set_next_enabled(self.current_index < len(self.files) - 1)
 
     def _rename_files(self, type):
         for filename in self.files:
             file_path = os.path.join(self.folder_path, filename)
             title = self.metadataModel.get_title(file_path)
+
+            if not title or not title.strip():
+                self.view.update_status(f"Skipped: {filename} (no title)")
+                continue
 
             if type == 1:
                 new_name = f"{title} - {self.artist}.mp3"

@@ -19,3 +19,9 @@ class CustomEntry:
 
     def get_entry_text(self):
         return self.entry.get().strip()
+    
+    def hide_entry(self):
+        self.entry.place_forget()
+
+    def show_entry(self):
+        self.entry.place(x=self.posx, y=self.posy)

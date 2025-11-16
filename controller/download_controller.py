@@ -1,10 +1,11 @@
 import threading
 from model.youtube_model import YoutubeModel
 
-class DownloadController:
+class DownloadController:    
     def __init__(self, view):
         self.view = view
         self.youtubeModel = YoutubeModel()
+        self.SUPPORTED_MODES = ['mp3'] 
 
     def download_requested(self, data: dict, folderPath: str):
         error_msg = self._validate_data(data)
@@ -27,8 +28,9 @@ class DownloadController:
             return "Error: URL missing"
         if not folder:
             return "Error: Folder missing"
-        if mode != 'mp3':
-            return "Error: Mode must be mp3"
+        if mode not in self.SUPPORTED_MODES:
+            modes_str = ", ".join(self.SUPPORTED_MODES)
+            return f"Error: Unsupported mode. Supported: {modes_str}"
         return None
     
     def _run_download(self, url: str, folderPath: str):
@@ -49,8 +51,10 @@ class DownloadController:
             downloaded = d.get('downloaded_bytes', 0)
             percent = int((downloaded / total) * 100)
 
-            self.view.root.after(0, self.view.update_progress, percent)
-            self.view.root.after(0, self.view.update_status, f"Downloading: {percent}%")
+            if hasattr(self.view, 'root') and self.view.root:
+                self.view.root.after(0, self.view.update_progress, percent)
+                self.view.root.after(0, self.view.update_status, f"Downloading: {percent}%")
         
         elif d['status'] == 'finished':
-            self.view.root.after(0, self.view.update_status, "Processing file...")
+            if hasattr(self.view, 'root') and self.view.root:
+                self.view.root.after(0, self.view.update_status, "Processing file...")

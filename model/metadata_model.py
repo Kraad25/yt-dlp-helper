@@ -21,5 +21,6 @@ class MetadataModel:
             audio.tags["TPE1"] = TPE1(encoding=3, text=artist)
             audio.tags["TALB"] = TALB(encoding=3, text=album)
             audio.save()
+            return True
         except Exception as e:
-            print(f"Could not set metadata for {file_path}: {e}")
+            return False

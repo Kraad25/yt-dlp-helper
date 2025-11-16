@@ -36,9 +36,3 @@ class BaseView(ttk.Frame, ABC):
     def show_info(self, title: str, message: str):
         from tkinter import messagebox
         messagebox.showinfo(title, message)
-
-    def update_view(self, data: dict):
-        pass    
-            
-
-    

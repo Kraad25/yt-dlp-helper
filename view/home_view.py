@@ -37,6 +37,8 @@ class HomeView(BaseView):
         self._create_metadata_section()
         self._create_progress_section()
         self._create_action_buttons()
+        
+        self.update_status("Ready")
 
     def _bind_events(self):
         if self.folder_entry:
@@ -141,6 +143,20 @@ class HomeView(BaseView):
         metadata_button = ttk.Button(self, text="Edit Metadata", width=20, command=lambda: self._on_metadata_clicked())
         metadata_button.place(x=300, y=525)
 
+        reset_button = ttk.Button(self, text="Reset Entries", width=20, command=lambda: self._reset_form())
+        reset_button.place(x=213, y=560)
+
+    def _reset_form(self):
+        if self.url_entry:
+            self.url_entry.set_entry_text("")
+        if self.artist_entry:
+            self.artist_entry.set_entry_text("")
+        if self.album_entry:
+            self.album_entry.set_entry_text("")
+            
+        self._mode_var.set(1)
+        self.update_progress(0)
+        self.update_status("Ready")
 
     # Event Handlers
 
@@ -182,16 +198,4 @@ class HomeView(BaseView):
     def update_status(self, status: str):
         if self.status_entry:
             self.status_entry.set_entry_text(status)
-
-    def reset_form(self):
-        if self.url_entry:
-            self.url_entry.set_entry_text("")
-        if self.artist_entry:
-            self.artist_entry.set_entry_text("")
-        if self.album_entry:
-            self.album_entry.set_entry_text("")
-            
-        self._mode_var.set(1)
-        self.update_progress(0)
-        self.update_status("Ready")
 

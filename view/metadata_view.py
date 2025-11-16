@@ -16,6 +16,7 @@ class MetadataView(BaseView):
         self.album_entry = None
         self.progress_bar = None
         self.status_entry = None
+        self.button_data = {}
 
         self.root = parent
         super().__init__(parent, controller)
@@ -113,28 +114,26 @@ class MetadataView(BaseView):
         editing_frame.pack_propagate(False)
 
         file_label = ttk.Label(editing_frame, text="Title :", font=("Helvetica", 11), background=self.theme.get_secondary_color())
-        file_label.place_forget()
         self.title_entry = CustomEntry(editing_frame, 50, 90, 20)
+        self.title_entry.make_entry()
         
         self.back_button = ttk.Button(editing_frame, text="Back", command=lambda:self._on_back_clicked())
-        self.back_button.place_forget()
         self.next_button = ttk.Button(editing_frame, text="Next", command=lambda:self._on_next_clicked())
-        self.next_button.place_forget()
         finish_button = ttk.Button(editing_frame, text="Finish Editing", command=lambda:self._on_finish_clicked())
-        finish_button.place_forget()
 
-        self.data = {"back": self.back_button,
-                     "next": self.next_button,
-                     "finish": finish_button,
-                     "label": file_label,
-                     "title_entry": self.title_entry
-                    }
         
-        self.start_button = ttk.Button(editing_frame, 
+        start_button = ttk.Button(editing_frame, 
                                   text="Start Editing", 
                                   command=lambda: self._on_start_editing_clicked()
                                 )
-        self.start_button.place(x=200, y=90)
+        
+        self.button_data = {"back": self.back_button,
+                            "next": self.next_button,
+                            "finish": finish_button,
+                            "label": file_label,
+                            "title_entry": self.title_entry,
+                            "start": start_button
+                            }
 
     def _show_progess_state(self):
         ttk.Label(self, 
@@ -147,7 +146,7 @@ class MetadataView(BaseView):
 
     def _get_data(self):
         return {"title": self.title_entry.get_entry_text(),
-                "filename_type": self.filename_var
+                "filename_type": self.filename_var.get()
             }
     
     def _get_preset_data(self):
@@ -181,13 +180,25 @@ class MetadataView(BaseView):
         self.status_entry.set_entry_text(status)
 
     def start_editing_success(self):
-        self.start_button.place_forget()
+        self.button_data["start"].place_forget()
 
-        self.data["label"].place(x=50, y=20)
-        self.data["title_entry"].make_entry()
-        self.data["back"].place(x=110, y=90)
-        self.data["next"].place(x=210, y=90)
-        self.data["finish"].place(x=310, y=90)
+        self.button_data["title_entry"].show_entry()
+        self.button_data["label"].place(x=50, y=20)
+        self.button_data["back"].place(x=110, y=90)
+        self.button_data["next"].place(x=210, y=90)
+        self.button_data["finish"].place(x=310, y=90)
+
+    def reset_wizard_state(self):
+        self.button_data["start"].place(x=200, y=90)
+
+        self.button_data["label"].place_forget()
+        self.button_data["back"].place_forget()
+        self.button_data["next"].place_forget()
+        self.button_data["finish"].place_forget()
+        
+        self.button_data["title_entry"].hide_entry()
+
+        self.update_status("Ready")
 
 
     # Event Handler
@@ -195,8 +206,8 @@ class MetadataView(BaseView):
         self.notify_controller("on_home_requested")
 
     def _on_start_editing_clicked(self):      
-        data = self._get_preset_data()
-        self.notify_controller("start_editing_requested", data=data)
+        preset_data = self._get_preset_data()
+        self.notify_controller("on_start_editing", data=preset_data)
 
     def _on_next_clicked(self):
         data = self._get_data()
