@@ -2,9 +2,11 @@ import tkinter as tk
 from tkinter import ttk
 
 from typing import Optional
+
 from view.BaseView import BaseView
 from view.theme import AppTheme
 from view.custom_entry import CustomEntry
+from view.custom_combobox import CustomComboBox
 
 class HomeView(BaseView):
     def __init__(self, parent: tk.Widget, controller: Optional[None]):
@@ -34,6 +36,7 @@ class HomeView(BaseView):
         self._create_header()
         self._create_input_section()
         self._create_mode_section()
+        self._create_quality_section()
         self._create_metadata_section()
         self._create_progress_section()
         self._create_action_buttons()
@@ -84,17 +87,29 @@ class HomeView(BaseView):
                                          variable=self._mode_var, 
                                          value=1, 
                                          bg=self.theme.get_background_color(), 
-                                         activebackground=self.theme.get_background_color()
+                                         activebackground=self.theme.get_background_color(),
+                                         command=lambda: self._mode_changed()
                                         )
         mode_button_mp4 = tk.Radiobutton(self, 
                                          text="Mp4 🎬", 
                                          variable=self._mode_var, 
                                          value=2, 
                                          bg=self.theme.get_background_color(),
-                                         activebackground=self.theme.get_background_color()
+                                         activebackground=self.theme.get_background_color(),
+                                         command=lambda: self._mode_changed()
                                         )
         mode_button_mp3.place(x=30, y=160)
         mode_button_mp4.place(x=100, y=160)
+
+    def _create_quality_section(self):
+        ttk.Label(self,
+                  text="Quality:", 
+                  font=("Helvetica", 13), 
+                  background=self.theme.get_background_color()
+                ).place(x=30, y=200)
+        
+        self.quality_selector = CustomComboBox(self, self._mode_var, 100, 200)
+        self.quality_selector.make_combobox()
 
     def _create_metadata_section(self):
         metadata_frame = tk.LabelFrame(self,
@@ -107,7 +122,7 @@ class HomeView(BaseView):
                                        bd=5,
                                        relief="ridge"
                                       )
-        metadata_frame.place(x=30, y=200)
+        metadata_frame.place(x=30, y=240)
         metadata_frame.pack_propagate(False)
 
         ttk.Label(metadata_frame,
@@ -158,6 +173,10 @@ class HomeView(BaseView):
         self.update_progress(0)
         self.update_status("Ready")
 
+    def _mode_changed(self):
+        mode = "mp3" if self._mode_var.get()==1 else "mp4"
+        self.quality_selector.switch_mode(mode)
+
     # Event Handlers
 
     def _on_download_clicked(self):
@@ -183,6 +202,7 @@ class HomeView(BaseView):
             "url": self.url_entry.get_entry_text() if self.url_entry else "",
             "folder": self.folder_entry.get_entry_text() if self.folder_entry else "",
             "mode": "mp3" if self._mode_var.get() == 1 else "mp4",
+            "quality": self.quality_selector.get_value(),
             "artist": self.artist_entry.get_entry_text() if self.artist_entry else "",
             "album": self.album_entry.get_entry_text() if self.album_entry else ""
         }
@@ -197,5 +217,5 @@ class HomeView(BaseView):
 
     def update_status(self, status: str):
         if self.status_entry:
-            self.status_entry.set_entry_text(status)
+            self.status_entry.set_readonly_entry_text(status)
 

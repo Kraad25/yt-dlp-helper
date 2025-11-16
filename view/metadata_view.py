@@ -157,13 +157,13 @@ class MetadataView(BaseView):
     
     # Public Methods
     def set_folder_path(self, folder_path):
-        self.folder_path_entry.set_entry_text(folder_path)
+        self.folder_path_entry.set_readonly_entry_text(folder_path)
 
     def set_artist(self, artist):
-        self.artist_entry.set_entry_text(artist)
+        self.artist_entry.set_readonly_entry_text(artist)
         
     def set_album(self, album):
-        self.album_entry.set_entry_text(album)
+        self.album_entry.set_readonly_entry_text(album)
 
     def set_title(self, title):
         self.title_entry.set_entry_text(title)
@@ -177,7 +177,7 @@ class MetadataView(BaseView):
         self.back_button.config(state=state)
 
     def update_status(self, status):
-        self.status_entry.set_entry_text(status)
+        self.status_entry.set_readonly_entry_text(status)
 
     def start_editing_success(self):
         self.button_data["start"].place_forget()

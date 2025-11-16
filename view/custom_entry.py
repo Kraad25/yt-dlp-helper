@@ -17,6 +17,12 @@ class CustomEntry:
         self.entry.delete(0, tk.END)
         self.entry.insert(0, text)
 
+    def set_readonly_entry_text(self, text):
+        self.entry.config(state='normal')
+        self.entry.delete(0, tk.END)
+        self.entry.insert(0, text)
+        self.entry.config(state='readonly')
+
     def get_entry_text(self):
         return self.entry.get().strip()
     
