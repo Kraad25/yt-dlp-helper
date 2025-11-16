@@ -156,13 +156,9 @@ class MetadataView(BaseView):
                 }
     
     # Public Methods
-    def set_folder_path(self, folder_path):
+    def set_presets(self, folder_path, artist, album):
         self.folder_path_entry.set_readonly_entry_text(folder_path)
-
-    def set_artist(self, artist):
         self.artist_entry.set_readonly_entry_text(artist)
-        
-    def set_album(self, album):
         self.album_entry.set_readonly_entry_text(album)
 
     def set_title(self, title):

@@ -21,11 +21,6 @@ class FolderModel:
             self._folder_name = os.path.basename(folder_name)
         else:
             self._folder_name = folder_name
-
-    def get_full_path(self):
-        base_dir = self.get_base_directory()
-        full_path = os.path.join(base_dir, self._folder_name)
-        return os.path.normpath(full_path)
     
     def get_base_directory(self):
         return self.config.get("base_dir", "/")
@@ -33,6 +28,11 @@ class FolderModel:
     def set_base_directory (self, path: str):
         self.config["base_dir"] = path
         self._save_config()
+
+    def get_full_path(self):
+        base_dir = self.get_base_directory()
+        full_path = os.path.join(base_dir, self._folder_name)
+        return os.path.normpath(full_path)
 
     def _load_config(self):
         if os.path.exists(self.config_path):
