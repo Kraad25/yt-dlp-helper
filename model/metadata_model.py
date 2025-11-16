@@ -1,5 +1,5 @@
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TIT2, TPE1, TALB
+from mutagen.id3 import ID3, TIT2, TPE1, TALB, TRCK
 
 class MetadataModel:
     def __init__(self):
@@ -20,6 +20,10 @@ class MetadataModel:
             audio.tags["TIT2"] = TIT2(encoding=3, text=title)
             audio.tags["TPE1"] = TPE1(encoding=3, text=artist)
             audio.tags["TALB"] = TALB(encoding=3, text=album)
+            
+            if "TRCK" in audio.tags:
+                del audio.tags["TRCK"]
+            
             audio.save()
             return True
         except Exception as e:

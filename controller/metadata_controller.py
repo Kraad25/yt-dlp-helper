@@ -138,5 +138,7 @@ class MetadataController:
                     self.view.update_status(f"Rename failed: {filename} - {e}")
 
     def _sanitize_filename(self, name):
-        return re.sub(r'[\\/:*?"<>|]', '_', name)
+        name = name.replace(':', '：')
+        name = re.sub(r'[\\/*?"<>|]', '_', name)
+        return name
 

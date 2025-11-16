@@ -18,7 +18,11 @@ class YoutubeModel:
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
-            }]
+            },
+            {
+            'key': 'FFmpegMetadata',
+             }
+            ]
         if progress_hook:
             ydl_opts['progress_hooks'] = [progress_hook]
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
