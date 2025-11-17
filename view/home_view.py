@@ -152,8 +152,8 @@ class HomeView(BaseView):
         self.status_entry.make_entry()
 
     def _create_action_buttons(self):
-        download_button = ttk.Button(self, text="Download", width=20, command=lambda: self._on_download_clicked())
-        download_button.place(x=125, y=525)
+        self.download_button = ttk.Button(self, text="Download", width=20, command=lambda: self._on_download_clicked())
+        self.download_button.place(x=125, y=525)
 
         metadata_button = ttk.Button(self, text="Edit Metadata", width=20, command=lambda: self._on_metadata_clicked())
         metadata_button.place(x=300, y=525)
@@ -211,6 +211,10 @@ class HomeView(BaseView):
         if self.folder_entry:
             self.folder_entry.set_entry_text(path)
 
+    def set_download_enabled(self, enabled: bool):
+        state = tk.NORMAL if enabled else tk.DISABLED
+        self.download_button.config(state=state)
+
     def update_progress(self, value: int):
         if self.progress_bar:
             self.progress_bar['value'] = value
@@ -218,4 +222,3 @@ class HomeView(BaseView):
     def update_status(self, status: str):
         if self.status_entry:
             self.status_entry.set_readonly_entry_text(status)
-

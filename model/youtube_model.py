@@ -42,6 +42,10 @@ class YoutubeModel:
             'quiet': True,
             'no_warnings': True,
             'format': f'bestvideo[height<={height}]+bestaudio/best/best',
+            'postprocessors': [
+                {'key': 'FFmpegMetadata'},
+                {'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}
+            ]
         }
         if progress_hook:
             ydl_opts['progress_hooks'] = [progress_hook]

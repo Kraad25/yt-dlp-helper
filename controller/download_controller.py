@@ -10,6 +10,7 @@ class DownloadController:
         self.validator = DownloadValidator()
 
     def download_requested(self, url: str, folder: str, mode: str, quality: str, folderPath: str):
+        self.view.set_download_enabled(False)
         self._validate_data(url, folder, mode)
 
         if mode == 'mp4':
@@ -42,6 +43,8 @@ class DownloadController:
 
         except Exception as e:
             self._show_error(e)
+        
+        self.view.set_download_enabled(True)
 
     def _run_video_download(self, url: str, folderPath: str, quality: str):
         try:
@@ -52,8 +55,11 @@ class DownloadController:
                 progress_hook=self._progress_hook
             )
             self.view.update_status("Done")
+            
         except Exception as e:
             self._show_error(e)
+        
+        self.view.set_download_enabled(True)
 
 
     def _progress_hook(self, d: dict):

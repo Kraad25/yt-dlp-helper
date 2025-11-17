@@ -68,11 +68,16 @@ class MetadataView(BaseView):
         self.album_entry = CustomEntry(self, width= 50, posx=130, posy=180)
         self.album_entry.make_entry()
 
+        mode_label = ttk.Label(self, text="Mode: ",font=("Helvetica", 10) ,background=self.theme.get_background_color())
+        mode_label.place(x=30, y=210)
+        self.mode_entry = CustomEntry(self, width= 50, posx=130, posy=210)
+        self.mode_entry.make_entry()
+
     def _show_filenaming_options(self):
         ttk.Label(self, text="File Name",
                   font=("Helvetica", 12, "bold"),
                   background=self.theme.get_background_color()
-                ).place(x=30, y=220)
+                ).place(x=30, y=250)
 
         title_artist = tk.Radiobutton(self,
                                       text="Title - Artist", 
@@ -95,9 +100,9 @@ class MetadataView(BaseView):
                                bg=self.theme.get_background_color(), 
                                activebackground=self.theme.get_background_color()
                             )
-        title_artist.place(x=30, y=250)
-        title_album.place(x=30, y=270)
-        title.place(x=120, y=251)
+        title_artist.place(x=30, y=270)
+        title_album.place(x=30, y=300)
+        title.place(x=120, y=271)
 
     def _show_editing_field(self):
         editing_frame = tk.LabelFrame(self,
@@ -110,7 +115,7 @@ class MetadataView(BaseView):
                                       bd=5,
                                       relief="ridge"
                                     )
-        editing_frame.place(x=30, y=320)
+        editing_frame.place(x=30, y=350)
         editing_frame.pack_propagate(False)
 
         file_label = ttk.Label(editing_frame, text="Title :", font=("Helvetica", 11), background=self.theme.get_secondary_color())
@@ -140,8 +145,8 @@ class MetadataView(BaseView):
                   text="Status: ", 
                   background=self.theme.get_background_color(), 
                   font=("Segoe UI", 12, "italic")
-                ).place(x=180, y=500)
-        self.status_entry = CustomEntry(self, width=20, posx=230, posy=503)
+                ).place(x=180, y=530)
+        self.status_entry = CustomEntry(self, width=20, posx=230, posy=533)
         self.status_entry.make_entry()
 
     def _get_data(self):
@@ -152,14 +157,16 @@ class MetadataView(BaseView):
     def _get_preset_data(self):
         return {"folder_path": self.folder_path_entry.get_entry_text(),
                 "artist" : self.artist_entry.get_entry_text(),
-                "album": self.album_entry.get_entry_text()
+                "album": self.album_entry.get_entry_text(),
+                "mode": self.mode_entry.get_entry_text()
                 }
     
     # Public Methods
-    def set_presets(self, folder_path, artist, album):
+    def set_presets(self, folder_path, artist, album, mode):
         self.folder_path_entry.set_readonly_entry_text(folder_path)
         self.artist_entry.set_readonly_entry_text(artist)
         self.album_entry.set_readonly_entry_text(album)
+        self.mode_entry.set_readonly_entry_text(mode)
 
     def set_title(self, title):
         self.title_entry.set_entry_text(title)

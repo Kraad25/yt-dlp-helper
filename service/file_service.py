@@ -16,6 +16,6 @@ class FileRenamer:
     
     @staticmethod
     def _sanitize_filename(name):
-        name = name.replace(':', '：')
+        name = name.replace(': ', '：')  
         name = re.sub(r'[\\/*?"<>|]', '_', name)
         return name

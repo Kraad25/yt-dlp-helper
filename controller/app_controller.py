@@ -58,15 +58,17 @@ class Application:
         folder_path = self.folder_controller.provide_full_path()
         artist = data.get("artist", "")
         album = data.get("album", "")
+        mode = data.get("mode", "")
 
-        self.metadata_controller.reset(folder_path, artist, album)
+        self.metadata_controller.reset(folder_path, artist, album, mode)
         self.show_metadata()
 
     def on_start_editing(self, data):
         folder_path = data.get("folder_path", "")
         artist = data.get("artist", "")
         album = data.get("album", "")
-        files = self.folder_controller.get_files(folder_path)
+        mode = data.get("mode", "")
+        files = self.folder_controller.get_files(folder_path, mode)
 
         self.metadata_controller.editing_started(files, artist, album)
 

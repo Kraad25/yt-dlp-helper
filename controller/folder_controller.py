@@ -5,6 +5,8 @@ class FolderController:
     def __init__(self, view):
         self.folder_model = FolderModel()
         self.view = view
+        self.AUDIO_EXT = (".mp3", ".aac", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma")
+        self.VIDEO_EXT = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv")
 
     def browse_folder(self):
         folder = self.folder_model.browse_folder()
@@ -18,8 +20,15 @@ class FolderController:
     def provide_full_path(self):
         return self.folder_model.get_full_path()
     
-    def get_files(self, folder_path):
+    def get_files(self, folder_path, mode):
+        if mode == "mp3":
+            extensions = self.AUDIO_EXT
+        elif mode == "mp4":
+            extensions = self.VIDEO_EXT
+        else:
+            extensions = self.AUDIO_EXT + self.VIDEO_EXT
+        
         return [
             f for f in os.listdir(folder_path)
-            if os.path.isfile(os.path.join(folder_path, f)) and f.lower().endswith('.mp3')
+            if os.path.isfile(os.path.join(folder_path, f)) and f.lower().endswith(extensions)
         ]
