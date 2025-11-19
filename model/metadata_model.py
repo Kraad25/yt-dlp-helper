@@ -27,7 +27,7 @@ class MetadataModel:
         except Exception:
             return ""
 
-    def set_audio_metadata(self, file_path: str, title: str, artist: str, album: str) -> None:
+    def set_audio_metadata(self, file_path: str, title: str, artist: str, album: str):
         try:
             audio = MP3(file_path, ID3=ID3)
             if audio.tags is None:
