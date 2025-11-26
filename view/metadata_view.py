@@ -45,10 +45,6 @@ class MetadataView(BaseView):
         self._set_presets(folder_path, artist, album, mode)
         self._reset_wizard_state()
 
-        self.folder_path = folder_path
-        self.current_index=0
-        self.mode = mode
-
     def set_title(self, title):
         self.__title_entry.set_entry_text(title)
 
@@ -64,7 +60,7 @@ class MetadataView(BaseView):
         mode = data.get("mode", "")
 
         files = self.__folder_controller.get_files(folder_path, mode)
-        self.__metadata_controller.editing_requested(files, artist, album, folder_path, mode, 
+        self.__metadata_controller.editing_requested(files, data, 
                                                      self.set_title, self._show_wizard, self._update_status,
                                                      self._set_next_enabled, self._set_back_enabled)
 

@@ -33,14 +33,22 @@ class MetadataController:
         self.__update_status: Callable = None
         
     # Public Methods
-    def editing_requested(self, files: list, artist: str, album: str, folder_path: str, mode: str,
+    def editing_requested(self, files: list, data: dict,
                           set_title: Callable, show_wizard: Callable, update_status: Callable, 
                           enable_next: Callable, enable_back: Callable):
+        
+        folder_path = data.get("folder_path", "")
+        artist = data.get("artist", "")
+        album = data.get("album", "")
+        mode = data.get("mode", "")
+
         self.__files = files
         self.__artist = artist
         self.__album = album
         self.__folder_path = folder_path
         self.__mode = mode
+        self.__current_index = 0
+        
         self._set_callbacks(set_title, enable_next, enable_back, update_status)
 
         self._validate_folder(self.__folder_path, self.__files)

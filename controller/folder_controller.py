@@ -1,18 +1,18 @@
 import os
+from typing import Callable
 from model.folder_model import FolderModel
 
 class FolderController:
-    def __init__(self, view):
+    def __init__(self):
         self.folder_model = FolderModel()
-        self.view = view
         self.AUDIO_EXT = (".mp3", ".aac", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma")
         self.VIDEO_EXT = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv")
 
-    def browse_folder(self):
+    def browse_folder(self, set_folder_path: Callable):
         folder = self.folder_model.browse_folder()
         if not folder:
             folder = self.folder_model.get_full_path()
-        self.view.set_folder_path(folder)
+        set_folder_path(folder)
 
     def enter_folder_name(self, name):
         self.folder_model.set_folder_name(folder_name=name)

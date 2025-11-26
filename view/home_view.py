@@ -74,7 +74,7 @@ class HomeView(BaseView):
         self.__show_metadata(data)
 
     def _on_browse_clicked(self):
-        self.__folder_controller.browse_folder()
+        self.__folder_controller.browse_folder(self.set_folder_path)
 
     def _on_folder_entry_return(self, event):
         folder_name = self.__folder_entry.get_entry_text()
