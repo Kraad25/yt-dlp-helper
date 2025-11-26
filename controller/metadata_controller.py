@@ -24,7 +24,11 @@ class MetadataController:
         self.mode = ""
         self.video_threads = []
            
-    def reset(self, folder_path: str, artist: str, album: str, mode: str):
+    def reset(self, data: dict, folder_path: str):
+        artist = data.get("artist", "")
+        album = data.get("album", "")
+        mode = data.get("mode", "")
+        
         self.view.set_presets(folder_path, artist, album, mode)
         self.view.reset_wizard_state()
 

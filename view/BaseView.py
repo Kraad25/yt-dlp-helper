@@ -3,9 +3,8 @@ from tkinter import ttk
 from abc import ABC, abstractmethod
 
 class BaseView(ttk.Frame, ABC):
-    def __init__(self, parent: tk.Widget, controller):
+    def __init__(self, parent: tk.Widget):
         super().__init__(parent)
-        self._controller = controller
 
         self._setup_style()
         self._create_widgets()
@@ -23,16 +22,16 @@ class BaseView(ttk.Frame, ABC):
     def _bind_events(self):
         pass
 
-    # **kwargs catches all the extra keyword arguments in dictionary and allows flexibility for different events 
-    def notify_controller(self, event_name: str, **kwargs):
-        if self._controller and hasattr(self._controller, event_name):
-            handler = getattr(self._controller, event_name)
-            handler(**kwargs)
+    # # **kwargs catches all the extra keyword arguments in dictionary and allows flexibility for different events 
+    # def notify_controller(self, event_name: str, **kwargs):
+    #     if self._controller and hasattr(self._controller, event_name):
+    #         handler = getattr(self._controller, event_name)
+    #         handler(**kwargs)
 
-    def show_error(self, title: str, message: str):
-        from tkinter import messagebox
-        messagebox.showerror(title, message)
+    # def show_error(self, title: str, message: str):
+    #     from tkinter import messagebox
+    #     messagebox.showerror(title, message)
 
-    def show_info(self, title: str, message: str):
-        from tkinter import messagebox
-        messagebox.showinfo(title, message)
+    # def show_info(self, title: str, message: str):
+    #     from tkinter import messagebox
+    #     messagebox.showinfo(title, message)

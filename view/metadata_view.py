@@ -7,7 +7,7 @@ from view.theme import AppTheme
 from view.custom_entry import CustomEntry
 
 class MetadataView(BaseView):
-    def __init__(self, parent: tk.Widget, controller: Optional[None]):
+    def __init__(self, parent: tk.Widget):
         self.theme = AppTheme()
         self.filename_var = tk.IntVar(value=1)
 
@@ -19,7 +19,7 @@ class MetadataView(BaseView):
         self.button_data = {}
 
         self.root = parent
-        super().__init__(parent, controller)
+        super().__init__(parent)
 
 
     def _setup_style(self):

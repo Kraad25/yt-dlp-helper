@@ -1,21 +1,40 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 
 from view.theme import AppTheme
-from controller.app_controller import Application
+from view.home_view import HomeView
+from view.metadata_view import MetadataView
+
+from controller.folder_controller import FolderController
+from controller.download_controller import DownloadController
+from controller.metadata_controller import MetadataController
 
 class App:
     def __init__(self):
         self.root = tk.Tk()
         self.theme = AppTheme()
-        self.controller = Application(self.root)
 
+        self.__home_view: HomeView = None
+        self.__metadata_view: MetadataView = None
+        self.__download_controller: DownloadController = None
+        self.__metadata_controller: MetadataController = None
+        self.__folder_controller: FolderController = None
+
+        self._setup()
+
+    # Public Method
+    def run(self):
+        self.root.mainloop()
+
+    # Private Methods
+    def _setup(self):
         self._setup_window()
         self._create_menu_bar()
-        
-        self.controller.initialize_views()
-        self.controller.initialize_controllers()
-        self.controller.show_home()
+        self._initialize_views()
+        self._initialize_controllers()
+        self._wire_controllers_to_views()
+        self._show_home()
 
     def _setup_window(self):
         self.root.title("Youtube Converter")
@@ -41,13 +60,51 @@ class App:
         
         about_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="About", menu=about_menu)
-        # TODO : Add About section and link the method to the command
-        about_menu.add_command(label="About", command=lambda:None)
+        about_menu.add_command(label="About", command=self._show_about)
         
         self.root.configure(menu=menubar)
 
-    def run(self):
-        self.root.mainloop()
+    
+
+    def _initialize_views(self):
+        self.__home_view = HomeView(self.root)
+        self.__metadata_view = MetadataView(self.root)
+
+        for view in (self.__home_view, self.__metadata_view):
+            view.place(x=0, y=0, width=560, height=600)
+            view.pack_propagate(False)
+
+    def _initialize_controllers(self):
+        self.__download_controller = DownloadController()
+        self.__folder_controller = FolderController(self.__home_view)
+        self.__metadata_controller = MetadataController(self.__metadata_view)
+
+    def _wire_controllers_to_views(self):
+        self.__home_view.set_controllers(download_controller = self.__download_controller, 
+                                         folder_controller = self.__folder_controller,
+                                         metadata_callback = self._show_metadata
+                                        )
+        
+        # self.__metadata_view.set_controllers(self.__metadata_controller,
+        #                                      self.__folder_controller,
+        #                                      self._show_home
+        #                                     )
+
+    def _show_home(self):
+        self.__home_view.tkraise()
+
+    def _show_metadata(self, data: dict):
+        folder_path = self.__folder_controller.provide_full_path()
+        self.__metadata_controller.reset(data, folder_path)
+        self.__metadata_view.tkraise()
+
+    def _show_about(self):
+        messagebox.showinfo(
+            "About",
+            "YouTube Converter v1.0\n\n"
+            "Download and manage YouTube media\n"
+            "with metadata editing capabilities."
+        )
 
 
 if __name__ == "__main__":
