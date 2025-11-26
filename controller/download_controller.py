@@ -9,11 +9,15 @@ class DownloadController:
         self.youtubeModel = YoutubeModel()
         self.validator = DownloadValidator()
 
-        self.__threads = []
+        self.__enable_download: Callable = None
+        self.__update_progress: Callable = None
+        self.__update_status: Callable = None
 
+    # Public Methods
     def download_requested(self, data: dict, path: str,
                            enable_download: Callable, update_progress: Callable, update_status: Callable):
-        
+
+        self._set_callbacks(enable_download, update_progress, update_status)
         enable_download(False)
 
         url = data.get("url", "")
@@ -21,100 +25,84 @@ class DownloadController:
         mode = data.get("mode", "")
         quality = data.get("quality", "")
 
-        if not self._validate_data(url, folder, mode, update_status):
-            enable_download(True)
+        if not self._validate_data(url, folder, mode):
+            self.__enable_download(True)
             return
 
         if mode == 'mp4':
-            self._request_video_download(url, path, quality, enable_download, update_progress, update_status)
+            self._request_video_download(url, path, quality)
         else:
-            self._request_audio_download(url, path, quality, enable_download, update_progress, update_status)    
+            self._request_audio_download(url, path, quality)    
 
-        update_progress(0)
-        update_status("Downloading")
+        self.__update_progress(0)
+        self.__update_status("Downloading")
     
-    def _validate_data(self, url: str, folder: str, mode: str, update_status: Callable):
+    # Private Methods
+    def _set_callbacks(self, enable_download: Callable, update_progress: Callable, update_status: Callable):
+        self.__enable_download: Callable = enable_download
+        self.__update_progress: Callable = update_progress
+        self.__update_status: Callable = update_status
+
+    def _validate_data(self, url: str, folder: str, mode: str):
         error_msg = self.validator.validate(url, folder, mode)
         if error_msg:
-            update_status(error_msg)
+            self.__update_status(error_msg)
             return False
         return True
         
-    def _request_audio_download(self, url: str, folderPath: str, quality: str, 
-                                enable_download: Callable, 
-                                update_progress: Callable, 
-                                update_status: Callable):
-        thread = threading.Thread(target=self._run_audio_download, 
-                                  args=(url, folderPath, quality, enable_download, 
-                                        update_progress, update_status), 
-                                  daemon=True
-                                )
+    def _request_audio_download(self, url: str, folderPath: str, quality: str):
+        thread = threading.Thread(target=self._run_audio_download, args=(url, folderPath, quality), daemon=True)
         thread.start()
-        self.__threads.append(thread)
 
-    def _request_video_download(self, url: str, folderPath: str, quality: str, 
-                                enable_download: Callable, 
-                                update_progress: Callable, 
-                                update_status: Callable):
-        thread = threading.Thread(target=self._run_video_download, 
-                                  args=(url, folderPath, quality, enable_download, update_progress, update_status), 
-                                  daemon=True
-                                )
+    def _request_video_download(self, url: str, folderPath: str, quality: str):
+        thread = threading.Thread(target=self._run_video_download,args=(url, folderPath, quality),daemon=True)
         thread.start()
-        self.__threads.append(thread)
     
-    def _run_audio_download(self, url: str, folderPath: str, quality: str, 
-                            enable_download: Callable, 
-                            update_progress: Callable, 
-                            update_status: Callable):
+    def _run_audio_download(self, url: str, folderPath: str, quality: str):
         try:
             self.youtubeModel.audio_download(url=url, 
                                              out_dir=folderPath, 
                                              quality=quality, 
-                                             progress_hook = lambda d: self._progress_hook(d, update_progress, update_status)
+                                             progress_hook = self._progress_hook
                                             )
-            update_status("Done")
+            self.__update_status("Done")
 
         except Exception as e:
-            self._show_error(e, update_status)
+            self._show_error(e)
         
-        enable_download(True)
+        self.__enable_download(True)
 
-    def _run_video_download(self, url: str, folderPath: str, quality: str,
-                            enable_download: Callable, 
-                            update_progress: Callable, 
-                            update_status: Callable):
+    def _run_video_download(self, url: str, folderPath: str, quality: str):
         try:
             self.youtubeModel.video_download(
                 url=url,
                 out_dir=folderPath,
                 quality=quality,
-                progress_hook = lambda d: self._progress_hook(d, update_progress, update_status)
+                progress_hook = self._progress_hook
             )
-            update_status("Done")
+            self.__update_status("Done")
             
         except Exception as e:
-            self._show_error(e, update_status)
+            self._show_error(e)
         
-        enable_download(True)
+        self.__enable_download(True)
 
-
-    def _progress_hook(self, d: dict, progress: Callable, status: Callable):
+    def _progress_hook(self, d: dict):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
             downloaded = d.get('downloaded_bytes', 0)
             percent = int((downloaded / total) * 100)
 
-            progress(percent)
-            status(f"Downloading: {percent}%")
+            self.__update_progress(percent)
+            self.__update_status(f"Downloading: {percent}%")
         
         elif d['status'] == 'finished':
-            status("Processing file...")
+            self.__update_status("Processing file...")
 
-    def _show_error(self, error, update_status: Callable):
+    def _show_error(self, error):
         error_msg = str(error).lower()
         if "not a valid url" in error_msg:
             error_msg = "Not a Valid URL"
         else:
             error_msg = str(error) if str(error) else "Unknown error occurred"
-        update_status(f"Error: {error_msg}")
+        self.__update_status(f"Error: {error_msg}")
