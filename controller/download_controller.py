@@ -6,12 +6,12 @@ from model.youtube_model import YoutubeModel
 
 class DownloadController:    
     def __init__(self):
-        self.youtubeModel = YoutubeModel()
+        self.youtube_model = YoutubeModel()
         self.validator = DownloadValidator()
 
-        self.__enable_download: Callable = None
-        self.__update_progress: Callable = None
-        self.__update_status: Callable = None
+        self._enable_download: Callable = None
+        self._update_progress: Callable = None
+        self._update_status: Callable = None
 
     # Public Methods
     def download_requested(self, data: dict, path: str,
@@ -26,7 +26,7 @@ class DownloadController:
         quality = data.get("quality", "")
 
         if not self._validate_data(url, folder, mode):
-            self.__enable_download(True)
+            self._enable_download(True)
             return
 
         if mode == 'mp4':
@@ -34,19 +34,19 @@ class DownloadController:
         else:
             self._request_audio_download(url, path, quality)    
 
-        self.__update_progress(0)
-        self.__update_status("Downloading")
+        self._update_progress(0)
+        self._update_status("Downloading")
     
     # Private Methods
     def _set_callbacks(self, enable_download: Callable, update_progress: Callable, update_status: Callable):
-        self.__enable_download: Callable = enable_download
-        self.__update_progress: Callable = update_progress
-        self.__update_status: Callable = update_status
+        self._enable_download: Callable = enable_download
+        self._update_progress: Callable = update_progress
+        self._update_status: Callable = update_status
 
     def _validate_data(self, url: str, folder: str, mode: str):
         error_msg = self.validator.validate(url, folder, mode)
         if error_msg:
-            self.__update_status(error_msg)
+            self._update_status(error_msg)
             return False
         return True
         
@@ -60,32 +60,32 @@ class DownloadController:
     
     def _run_audio_download(self, url: str, folderPath: str, quality: str):
         try:
-            self.youtubeModel.audio_download(url=url, 
+            self.youtube_model.audio_download(url=url, 
                                              out_dir=folderPath, 
                                              quality=quality, 
                                              progress_hook = self._progress_hook
                                             )
-            self.__update_status("Done")
+            self._update_status("Done")
 
         except Exception as e:
             self._show_error(e)
         
-        self.__enable_download(True)
+        self._enable_download(True)
 
     def _run_video_download(self, url: str, folderPath: str, quality: str):
         try:
-            self.youtubeModel.video_download(
+            self.youtube_model.video_download(
                 url=url,
                 out_dir=folderPath,
                 quality=quality,
                 progress_hook = self._progress_hook
             )
-            self.__update_status("Done")
+            self._update_status("Done")
             
         except Exception as e:
             self._show_error(e)
         
-        self.__enable_download(True)
+        self._enable_download(True)
 
     def _progress_hook(self, d: dict):
         if d['status'] == 'downloading':
@@ -93,11 +93,11 @@ class DownloadController:
             downloaded = d.get('downloaded_bytes', 0)
             percent = int((downloaded / total) * 100)
 
-            self.__update_progress(percent)
-            self.__update_status(f"Downloading: {percent}%")
+            self._update_progress(percent)
+            self._update_status(f"Downloading: {percent}%")
         
         elif d['status'] == 'finished':
-            self.__update_status("Processing file...")
+            self._update_status("Processing file...")
 
     def _show_error(self, error):
         error_msg = str(error).lower()
@@ -105,4 +105,4 @@ class DownloadController:
             error_msg = "Not a Valid URL"
         else:
             error_msg = str(error) if str(error) else "Unknown error occurred"
-        self.__update_status(f"Error: {error_msg}")
+        self._update_status(f"Error: {error_msg}")

@@ -23,11 +23,9 @@ class App:
 
         self._setup()
 
-    # Public Method
     def run(self):
         self.root.mainloop()
 
-    # Private Methods
     def _setup(self):
         self._setup_window()
         self._create_menu_bar()
@@ -44,10 +42,10 @@ class App:
         window_height = 600
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        
+
         x_position = int(screen_width * 0.3)
         y_position = int(screen_height * 0.1)
-        
+
         self.root.geometry(f'{window_width}x{window_height}+{x_position}+{y_position}')
         self.root.configure(background=self.theme.get_background_color())
 
@@ -57,14 +55,12 @@ class App:
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Exit", command=self.root.quit)
-        
+
         about_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="About", menu=about_menu)
         about_menu.add_command(label="About", command=self._show_about)
-        
-        self.root.configure(menu=menubar)
 
-    
+        self.root.configure(menu=menubar)
 
     def _initialize_views(self):
         self.__home_view = HomeView(self.root)
@@ -80,15 +76,17 @@ class App:
         self.__metadata_controller = MetadataController()
 
     def _wire_controllers_to_views(self):
-        self.__home_view.set_controllers(download_controller = self.__download_controller, 
-                                         folder_controller = self.__folder_controller,
-                                         metadata_callback = self._show_metadata
-                                        )
-        
-        self.__metadata_view.set_controllers(self.__metadata_controller,
-                                             self.__folder_controller,
-                                             self._show_home
-                                            )
+        self.__home_view.set_controllers(
+            download_controller=self.__download_controller,
+            folder_controller=self.__folder_controller,
+            metadata_callback=self._show_metadata
+        )
+
+        self.__metadata_view.set_controllers(
+            self.__metadata_controller,
+            self.__folder_controller,
+            self._show_home
+        )
 
     def _show_home(self):
         self.__home_view.tkraise()

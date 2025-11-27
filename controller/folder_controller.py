@@ -9,9 +9,7 @@ class FolderController:
         self.VIDEO_EXT = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv")
 
     def browse_folder(self, set_folder_path: Callable):
-        folder = self.folder_model.browse_folder()
-        if not folder:
-            folder = self.folder_model.get_full_path()
+        folder = self.folder_model.browse_folder() or self.folder_model.get_full_path()
         set_folder_path(folder)
 
     def enter_folder_name(self, name):
