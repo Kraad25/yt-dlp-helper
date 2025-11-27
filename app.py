@@ -1,6 +1,7 @@
 import tkinter as tk
-from tkinter import ttk
 from tkinter import messagebox
+from tkinter import *
+from tkinter.ttk import *
 
 from view.theme import AppTheme
 from view.home_view import HomeView
@@ -33,6 +34,11 @@ class App:
         self._initialize_controllers()
         self._wire_controllers_to_views()
         self._show_home()
+        
+        try:
+            self.root.iconbitmap('skull.ico')
+        except:
+            return
 
     def _setup_window(self):
         self.root.title("Youtube Converter")
