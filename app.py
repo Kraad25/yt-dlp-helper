@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
-from tkinter import *
-from tkinter.ttk import *
-
+import tkinter.ttk as ttk
 from view.theme import AppTheme
 from view.home_view import HomeView
 from view.metadata_view import MetadataView
@@ -37,11 +35,11 @@ class App:
         
         try:
             self.root.iconbitmap('skull.ico')
-        except:
-            return
+        except Exception:
+            pass
 
     def _setup_window(self):
-        self.root.title("Youtube Converter")
+        self.root.title("YouTube Converter v1.0")
         self.root.resizable(False, False)
 
         window_width = 560
@@ -86,13 +84,7 @@ class App:
             download_controller=self.__download_controller,
             folder_controller=self.__folder_controller,
             metadata_callback=self._show_metadata
-        )
-
-        self.__metadata_view.set_controllers(
-            self.__metadata_controller,
-            self.__folder_controller,
-            self._show_home
-        )
+                )
 
     def _show_home(self):
         self.__home_view.tkraise()
@@ -108,6 +100,7 @@ class App:
             "YouTube Converter v1.0\n\n"
             "Download and manage YouTube media\n"
             "with metadata editing capabilities."
+            "Created by Krishna and Mihir"
         )
 
 
