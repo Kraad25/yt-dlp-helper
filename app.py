@@ -98,9 +98,9 @@ class App:
         messagebox.showinfo(
             "About",
             "YouTube Converter v1.0\n\n"
-            "Download and manage YouTube media\n"
-            "with metadata editing capabilities."
-            "Created by Krishna and Mihir"
+            "This program uses yt-dlp "
+            "(https://github.com/yt-dlp/yt-dlp)"
+            "which is licensed under the Unlicense."
         )
 
 
