@@ -84,7 +84,15 @@ class App:
             download_controller=self.__download_controller,
             folder_controller=self.__folder_controller,
             metadata_callback=self._show_metadata
-                )
+        )
+
+        self.__metadata_view.set_controllers(
+            metadata_controller=self.__metadata_controller,
+            folder_controller=self.__folder_controller,
+            home_callback=self._show_home
+        )
+
+        self.__home_view.set_cancel_callback(self.__download_controller.cancel_download)
 
     def _show_home(self):
         self.__home_view.tkraise()

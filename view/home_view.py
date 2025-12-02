@@ -24,11 +24,15 @@ class HomeView(BaseView):
         self._album_entry = None
         self._progress_bar = None
         self._status_entry = None
+        self._quality_selector = None
+        self._download_button = None
 
         self._download_controller = None
         self._folder_controller = None
 
         self._show_metadata: Callable = None
+        self._on_cancel: Callable = None
+
         self.root = parent
         super().__init__(parent)
 
@@ -37,6 +41,9 @@ class HomeView(BaseView):
         self._download_controller = download_controller
         self._folder_controller = folder_controller
         self._show_metadata = metadata_callback
+
+    def set_cancel_callback(self, callback: Callable):
+        self._on_cancel = callback
 
     def set_folder_path(self, path: str):
         if self._folder_entry:
@@ -77,6 +84,10 @@ class HomeView(BaseView):
     def _on_browse_clicked(self):
         self._folder_controller.browse_folder(self.set_folder_path)
 
+    def _on_cancel_clicked(self):
+        if self._on_cancel:
+            self._on_cancel()
+
     # Private Methods
     def _setup_style(self):
         style = ttk.Style()
@@ -103,7 +114,7 @@ class HomeView(BaseView):
         self._quality_selector = self._create_quality_section()
         self._metadata_frame, self._artist_entry, self._album_entry = self._create_metadata_section()
         self._progress_bar, self._status_entry = self._create_progress_section()
-        self._download_button, self._metadata_button, self._reset_button = self._create_action_buttons()
+        self._download_button, self._metadata_button, self._cancel_button, self._reset_button = self._create_action_buttons()
 
         self.update_status("Ready")
 
@@ -237,15 +248,20 @@ class HomeView(BaseView):
 
     def _create_action_buttons(self):
         download_button = ttk.Button(self, text="Download", width=20, command=lambda: self._on_download_clicked())
-        download_button.place(x=125, y=525)
-
-        metadata_button = ttk.Button(self, text="Edit Metadata", width=20, command=lambda: self._on_metadata_clicked())
-        metadata_button.place(x=300, y=525)
+        download_button.place(x=60, y=525)
 
         reset_button = ttk.Button(self, text="Reset Entries", width=20, command=lambda: self._reset_form())
-        reset_button.place(x=213, y=560)
+        reset_button.place(x=213, y=525)
+   
+        cancel_button = ttk.Button(self, text="Cancel", width=20, command=lambda: self._on_cancel_clicked())
+        cancel_button.place(x=366, y=525)
 
-        return download_button, metadata_button, reset_button
+        metadata_button = ttk.Button(self, text="Edit Metadata ➜", width=20, 
+                                     command=lambda: self._on_metadata_clicked()
+                                    )
+        metadata_button.place(x=213, y=560)
+
+        return download_button, metadata_button, cancel_button, reset_button
 
     def _reset_form(self):
         if self._url_entry:

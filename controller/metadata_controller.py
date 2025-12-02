@@ -6,6 +6,7 @@ from model.validators import FolderValidator
 from model.metadata_model import MetadataModel
 
 from service.file_service import FileRenamer
+from service.error_service import ErrorHandlingService
 
 from enum import IntEnum
 class FilenameFormat(IntEnum):
@@ -17,6 +18,7 @@ class MetadataController:
     def __init__(self):
         self.metadata_model = MetadataModel()
         self.metadata_editing_folder = FolderValidator()
+        self.error = ErrorHandlingService()
 
         self._files = []
         self._current_index = 0        
@@ -50,7 +52,8 @@ class MetadataController:
         
         self._set_callbacks(set_title, enable_next, enable_back, update_status)
 
-        self._validate_folder(self._folder_path, self._files)
+        if not self._validate_folder(self._folder_path, self._files):
+            return
         show_wizard()
 
         file_name, file_path = self._get_current_file_info()
@@ -99,11 +102,14 @@ class MetadataController:
 
     def _validate_folder(self, folder, files):
         if not self.metadata_editing_folder.validate(folder):
-            self._update_status("Error: Folder contains Subfolders")
-            return
+            self.error.handle_error(update_status=self._update_status,
+                                    custom_msg="Error: Folder contains Subfolders")
+            return False
         if not files:
-            self._update_status(f"Error: No {self._mode} files found")
-            return
+            self.error.handle_error(update_status=self._update_status,
+                                    custom_msg=f"Error: No {self._mode} files found")
+            return False
+        return True
         
     def _get_current_file_info(self):
         file_name = self._files[self._current_index]
@@ -171,9 +177,4 @@ class MetadataController:
         try:
             self.metadata_model.set_video_metadata(for_file, with_title, with_artist, with_album)
         except Exception as e:
-            self._show_error(e)
-            
-    def _show_error(self, error):
-        error_msg = str(error).lower()
-        error_msg = str(error) if str(error) else "Unknown error occurred"
-        self._update_status(f"Error: {error_msg}")
+            self.error.handle_error(self._update_status, error=e)

@@ -2,9 +2,6 @@ import yt_dlp
 import os
 
 class YoutubeModel:
-    def __init__(self):
-        pass
-
     def audio_download(self, url, out_dir, quality='192', progress_hook=None):
         ydl_opts = {
             'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
