@@ -97,7 +97,7 @@ class HomeView(BaseView):
         self.configure(style="Beige.TFrame")
 
         self._title = self._create_header()
-        self._url_entry = self._creat_url_input()
+        self._url_entry = self._create_url_input()
         self._folder_entry, self._browse_button = self._create_folder_input()
         self._mp3_radio, self._mp4_radio = self._create_mode_section()
         self._quality_selector = self._create_quality_section()
@@ -116,7 +116,7 @@ class HomeView(BaseView):
         ).place(x=195, y=20)
         return label
 
-    def _creat_url_input(self):
+    def _create_url_input(self):
         label = ttk.Label(
             self,
             text="URL:",

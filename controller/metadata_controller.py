@@ -30,7 +30,6 @@ class MetadataController:
         self._update_status: Callable = None
         self._enable_next: Callable = None
         self._enable_back: Callable = None
-        self._update_status: Callable = None
         
     # Public Methods
     def editing_requested(self, files: list, data: dict,
@@ -98,8 +97,8 @@ class MetadataController:
         self._enable_back: Callable = enable_back
         self._update_status: Callable = update_status
 
-    def _validate_folder(self, fodler, files):
-        if not self.metadata_editing_folder.validate(fodler):
+    def _validate_folder(self, folder, files):
+        if not self.metadata_editing_folder.validate(folder):
             self._update_status("Error: Folder contains Subfolders")
             return
         if not files:
@@ -114,7 +113,7 @@ class MetadataController:
     def _navigate_to_file(self, new_index: int):
         if not (0 <= new_index < len(self._files)):
             return # Outta bounds
-        self._current_index= new_index
+        self._current_index = new_index
         self.file_name, self.file_path = self._get_current_file_info()
 
         title = self._get_title(self.file_path)
