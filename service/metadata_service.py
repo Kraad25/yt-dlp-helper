@@ -55,7 +55,7 @@ class MetadataService:
         files: list[str],
         artist: str,
         album: str,
-        filename_format: FilenameFormat,
+        filename_format: int,
         update_status: Callable,
     ) -> bool:
         for filename in files:

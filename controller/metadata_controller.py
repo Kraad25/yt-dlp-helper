@@ -7,12 +7,6 @@ from model.metadata_model import MetadataModel
 from service.error_service import ErrorHandlingService
 from service.metadata_service import MetadataService
 
-from enum import IntEnum
-class FilenameFormat(IntEnum):
-    TITLE_ARTIST = 1
-    TITLE_ALBUM = 2
-    TITLE_ONLY = 3
-
 class MetadataController:
     def __init__(self):
         self.metadata_editing_folder = FolderValidator()
@@ -124,7 +118,7 @@ class MetadataController:
             files=self._files,
             artist=self._artist,
             album=self._album,
-            filename_format=FilenameFormat(type),
+            filename_format=type,
             update_status=self._update_status,
         )
 
