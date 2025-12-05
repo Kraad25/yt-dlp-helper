@@ -76,7 +76,7 @@ class App:
 
     def _initialize_controllers(self):
         self.__download_controller = DownloadController()
-        self.__folder_controller = FolderController()
+        self.__folder_controller = FolderController(self.__home_view.set_base_folder_path)
         self.__metadata_controller = MetadataController()
 
     def _wire_controllers_to_views(self):
@@ -98,7 +98,7 @@ class App:
         self.__home_view.tkraise()
 
     def _show_metadata(self, data: dict):
-        folder_path = self.__folder_controller.provide_full_path()
+        folder_path = data.get("path", "")
         self.__metadata_view.reset(data, folder_path)
         self.__metadata_view.tkraise()
 

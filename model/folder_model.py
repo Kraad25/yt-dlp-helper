@@ -1,45 +1,35 @@
-import os, json
+import os
+import json
 from tkinter import filedialog
 
 class FolderModel:
     def __init__(self, config_path='model/folder_config.json'):
-        self.config_path = config_path
-        self.config = self._load_config()
-        self._folder_name = ""
+        self.__config_path = config_path
+        self.__config = self.__load_config()
 
-    def browse_folder(self):
+    # Public Methods
+    def browse_folder(self) -> str | None:
         initial_dir = self.get_base_directory()
         selected_folder = filedialog.askdirectory(initialdir=initial_dir)
         if selected_folder:
-            self.set_base_directory(selected_folder)
-            return self.get_full_path()  
-        return None
-    
-    def set_folder_name(self, folder_name: str):
-        folder_name = folder_name.strip()
-        if os.path.isabs(folder_name):
-            self._folder_name = os.path.basename(folder_name)
-        else:
-            self._folder_name = folder_name
-    
+            self.__set_base_directory(selected_folder)
+            return selected_folder
+        return self.get_base_directory()
+
     def get_base_directory(self):
-        return self.config.get("base_dir", "/")
+        return self.__config.get("base_dir")
     
-    def set_base_directory (self, path: str):
-        self.config["base_dir"] = path
-        self._save_config()
+    # Private Methods    
+    def __set_base_directory (self, path: str):
+        self.__config["base_dir"] = path
+        self.__save_config()
 
-    def get_full_path(self):
-        base_dir = self.get_base_directory()
-        full_path = os.path.join(base_dir, self._folder_name)
-        return os.path.normpath(full_path)
-
-    def _load_config(self):
-        if os.path.exists(self.config_path):
-            with open(self.config_path, 'r') as f:
+    def __load_config(self):
+        if os.path.exists(self.__config_path):
+            with open(self.__config_path, 'r') as f:
                 return json.load(f)
         return {"base_dir": "/"}
 
-    def _save_config(self):
-        with open(self.config_path, 'w') as f:
-            json.dump(self.config, f, indent=4)
+    def __save_config(self):
+        with open(self.__config_path, 'w') as f:
+            json.dump(self.__config, f, indent=4)

@@ -4,9 +4,6 @@ import subprocess
 import os
 
 class MetadataModel:
-    def __init__(self):
-        pass
-
     def get_audio_title(self, file_path):
         try:
             audio = MP3(file_path, ID3=ID3)
