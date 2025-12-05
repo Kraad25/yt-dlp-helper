@@ -6,110 +6,112 @@ from view.BaseView import BaseView
 from view.custom_entry import CustomEntry
 from view.theme import AppTheme
 
+from controller.metadata_controller import MetadataController
+from controller.folder_controller import FolderController
 
 class MetadataView(BaseView):
     def __init__(self, parent: tk.Widget):
-        self.__theme = AppTheme()
-        self.__filename_var = tk.IntVar(value=1)
+        self._theme = AppTheme()
+        self._filename_var = tk.IntVar(value=1)
 
-        self.__folder_path_entry = None
-        self.__artist_entry = None
-        self.__album_entry = None
-        self.__mode_entry = None
-        self.__status_entry = None
-        self.__title_entry = None
+        self._folder_path_entry = None
+        self._artist_entry = None
+        self._album_entry = None
+        self._mode_entry = None
+        self._status_entry = None
+        self._title_entry = None
 
-        self.__back_button = None
-        self.__next_button = None
-        self.__button_data = {}
+        self._back_button = None
+        self._next_button = None
+        self._button_data = {}
 
-        self.__metadata_controller = None
-        self.__folder_controller = None
+        self._metadata_controller: MetadataController = None
+        self._folder_controller: FolderController = None
 
-        self.__show_home: Callable = None
+        self._show_home: Callable = None
 
         super().__init__(parent)
 
     # Public Methods
     def set_controllers(self, metadata_controller, folder_controller, home_callback: Callable):
-        self.__metadata_controller = metadata_controller
-        self.__folder_controller = folder_controller
-        self.__show_home = home_callback
+        self._metadata_controller = metadata_controller
+        self._folder_controller = folder_controller
+        self._show_home = home_callback
 
     def reset(self, data: dict, folder_path: str):
         artist = data.get("artist", "")
         album = data.get("album", "")
         mode = data.get("mode", "")
 
-        self.__set_presets(folder_path, artist, album, mode)
-        self.__reset_wizard_state()
+        self._set_presets(folder_path, artist, album, mode)
+        self._reset_wizard_state()
 
     def set_title(self, title):
-        self.__title_entry.set_entry_text(title)
+        self._title_entry.set_entry_text(title)
 
     # Event Handler
-    def __on_home_clicked(self):
-        self.__show_home()
+    def _on_home_clicked(self):
+        self._show_home()
 
-    def __on_start_editing_clicked(self):
-        data = self.__get_preset_data()
+    def _on_start_editing_clicked(self):
+        data = self._get_preset_data()
         folder_path = data.get("folder_path", "")
         mode = data.get("mode", "")
 
-        files = self.__folder_controller.get_files(folder_path, mode)
-        self.__metadata_controller.editing_requested(
+        files = self._folder_controller.get_files(folder_path, mode)
+        self._metadata_controller.editing_requested(
             files,
             data,
             self.set_title,
-            self.__show_wizard,
-            self.__update_status,
-            self.__set_next_enabled,
-            self.__set_back_enabled,
+            self._show_wizard,
+            self._update_status,
+            self._set_next_enabled,
+            self._set_back_enabled,
         )
 
-    def __on_next_clicked(self):
-        data = self.__get_data()
+    def _on_next_clicked(self):
+        data = self._get_data()
         title = data.get("title", "")
-        self.__metadata_controller.on_next(title)
+        self._metadata_controller.on_next(title)
 
-    def __on_back_clicked(self):
-        data = self.__get_data()
+    def _on_back_clicked(self):
+        data = self._get_data()
         title = data.get("title", "")
-        self.__metadata_controller.on_back(title)
+        self._metadata_controller.on_back(title)
 
-    def __on_finish_clicked(self):
-        data = self.__get_data()
+    def _on_finish_clicked(self):
+        data = self._get_data()
         title = data.get("title", "")
         type = data.get("filename_type", "")
-        self.__metadata_controller.on_finish(title, type)
+        self._metadata_controller.on_finish(title, type)
 
     # Private Methods
     def _setup_style(self):
         style = ttk.Style()
-        style.configure("Beige.TFrame", background=self.__theme.get_background_color())
+        style.configure("Beige.TFrame", background=self._theme.get_background_color())
         style.configure(
             "Grey.TLabelframe",
-            background=self.__theme.get_secondary_color(),
+            background=self._theme.get_secondary_color(),
             borderwidth=2,
             relief="solid",
         )
         style.configure(
             "Grey.TLabelframe.Label",
-            background=self.__theme.get_secondary_color(),
+            background=self._theme.get_secondary_color(),
             font=("Segoe UI", 10),
         )
 
     def _create_widgets(self):
         self.configure(style="Beige.TFrame")
 
-        home_button = self.__create_home_button()
-        title = self.__create_header()
-        self.__folder_path_entry, self.__artist_entry, self.__album_entry, self.__mode_entry = self.__show_presets()
-        title_artist, title_album, title = self.__show_filenaming_options()
-        self.__title_entry, self.__back_button, self.__next_button, self.__button_data = self.__show_editing_field()
-        self.__status_entry = self.__show_progess_state()
+        home_button = self._create_home_button()
+        title = self._create_header()
+        self._folder_path_entry, self._artist_entry, self._album_entry, self._mode_entry = self._show_presets()
+        title_artist, title_album, title = self._show_filenaming_options()
+        self._title_entry, self._back_button, self._next_button, self._button_data = self._show_editing_field()
+        self._status_entry = self._show_progess_state()
 
-    def __create_home_button(self):
+    def _create_home_button(self):
         home_button = tk.Button(
             self,
             text="🏠",
@@ -117,27 +119,27 @@ class MetadataView(BaseView):
             padx=1,
             pady=1,
             bd=0,
-            command=lambda: self.__on_home_clicked(),
+            command=lambda: self._on_home_clicked(),
         )
         home_button.place(x=10, y=10)
         return home_button
 
-    def __create_header(self):
+    def _create_header(self):
         title_label = ttk.Label(
             self,
             text="Metadata Editor",
             font=("Helvetica", 16),
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
         )
         title_label.place(x=200, y=20)
         return title_label
 
-    def __show_presets(self):
+    def _show_presets(self):
         preset_label = ttk.Label(
             self,
             text="Presets",
             font=("Helvetica", 13, "bold"),
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
         )
         preset_label.place(x=30, y=80)
 
@@ -145,7 +147,7 @@ class MetadataView(BaseView):
             self,
             text="Folder Path: ",
             font=("Helvetica", 10),
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
         )
         folder_label.place(x=30, y=120)
         folder_path_entry = CustomEntry(self, width=50, posx=130, posy=120)
@@ -155,7 +157,7 @@ class MetadataView(BaseView):
             self,
             text="Artist: ",
             font=("Helvetica", 10),
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
         )
         artist_label.place(x=30, y=150)
         artist_entry = CustomEntry(self, width=50, posx=130, posy=150)
@@ -165,7 +167,7 @@ class MetadataView(BaseView):
             self,
             text="Album: ",
             font=("Helvetica", 10),
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
         )
         album_label.place(x=30, y=180)
         album_entry = CustomEntry(self, width=50, posx=130, posy=180)
@@ -175,7 +177,7 @@ class MetadataView(BaseView):
             self,
             text="Mode: ",
             font=("Helvetica", 10),
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
         )
         mode_label.place(x=30, y=210)
         mode_entry = CustomEntry(self, width=50, posx=130, posy=210)
@@ -183,37 +185,37 @@ class MetadataView(BaseView):
 
         return folder_path_entry, artist_entry, album_entry, mode_entry
 
-    def __show_filenaming_options(self):
+    def _show_filenaming_options(self):
         ttk.Label(
             self,
             text="File Name",
             font=("Helvetica", 12, "bold"),
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
         ).place(x=30, y=250)
 
         title_artist = tk.Radiobutton(
             self,
             text="Title - Artist",
-            variable=self.__filename_var,
+            variable=self._filename_var,
             value=1,
-            bg=self.__theme.get_background_color(),
-            activebackground=self.__theme.get_background_color(),
+            bg=self._theme.get_background_color(),
+            activebackground=self._theme.get_background_color(),
         )
         title_album = tk.Radiobutton(
             self,
             text="Title - Album",
-            variable=self.__filename_var,
+            variable=self._filename_var,
             value=2,
-            bg=self.__theme.get_background_color(),
-            activebackground=self.__theme.get_background_color(),
+            bg=self._theme.get_background_color(),
+            activebackground=self._theme.get_background_color(),
         )
         title = tk.Radiobutton(
             self,
             text="Title",
-            variable=self.__filename_var,
+            variable=self._filename_var,
             value=3,
-            bg=self.__theme.get_background_color(),
-            activebackground=self.__theme.get_background_color(),
+            bg=self._theme.get_background_color(),
+            activebackground=self._theme.get_background_color(),
         )
 
         title_artist.place(x=30, y=270)
@@ -222,13 +224,13 @@ class MetadataView(BaseView):
 
         return title_artist, title_album, title
 
-    def __show_editing_field(self):
+    def _show_editing_field(self):
         editing_frame = tk.LabelFrame(
             self,
             text="Edit Metadata",
             width=500,
             height=150,
-            bg=self.__theme.get_secondary_color(),
+            bg=self._theme.get_secondary_color(),
             fg="black",
             font=("Arial", 10, "italic bold"),
             bd=5,
@@ -241,19 +243,19 @@ class MetadataView(BaseView):
             editing_frame,
             text="Title :",
             font=("Helvetica", 11),
-            background=self.__theme.get_secondary_color(),
+            background=self._theme.get_secondary_color(),
         )
         title_entry = CustomEntry(editing_frame, 50, 90, 20)
         title_entry.make_entry()
 
-        back_button = ttk.Button(editing_frame, text="Back", command=lambda: self.__on_back_clicked())
-        next_button = ttk.Button(editing_frame, text="Next", command=lambda: self.__on_next_clicked())
-        finish_button = ttk.Button(editing_frame, text="Finish Editing", command=lambda: self.__on_finish_clicked())
+        back_button = ttk.Button(editing_frame, text="Back", command=lambda: self._on_back_clicked())
+        next_button = ttk.Button(editing_frame, text="Next", command=lambda: self._on_next_clicked())
+        finish_button = ttk.Button(editing_frame, text="Finish Editing", command=lambda: self._on_finish_clicked())
 
         start_button = ttk.Button(
             editing_frame,
             text="Start Editing",
-            command=lambda: self.__on_start_editing_clicked(),
+            command=lambda: self._on_start_editing_clicked(),
         )
 
         button_data = {
@@ -267,11 +269,11 @@ class MetadataView(BaseView):
 
         return title_entry, back_button, next_button, button_data
 
-    def __show_progess_state(self):
+    def _show_progess_state(self):
         ttk.Label(
             self,
             text="Status: ",
-            background=self.__theme.get_background_color(),
+            background=self._theme.get_background_color(),
             font=("Segoe UI", 12, "italic"),
         ).place(x=180, y=530)
 
@@ -280,54 +282,54 @@ class MetadataView(BaseView):
 
         return status_entry
 
-    def __get_data(self):
+    def _get_data(self):
         return {
-            "title": self.__title_entry.get_entry_text(),
-            "filename_type": self.__filename_var.get(),
+            "title": self._title_entry.get_entry_text(),
+            "filename_type": self._filename_var.get(),
         }
 
-    def __get_preset_data(self):
+    def _get_preset_data(self):
         return {
-            "folder_path": self.__folder_path_entry.get_entry_text(),
-            "artist": self.__artist_entry.get_entry_text(),
-            "album": self.__album_entry.get_entry_text(),
-            "mode": self.__mode_entry.get_entry_text(),
+            "folder_path": self._folder_path_entry.get_entry_text(),
+            "artist": self._artist_entry.get_entry_text(),
+            "album": self._album_entry.get_entry_text(),
+            "mode": self._mode_entry.get_entry_text(),
         }
 
-    def __set_presets(self, folder_path, artist, album, mode):
-        self.__folder_path_entry.set_readonly_entry_text(folder_path)
-        self.__artist_entry.set_readonly_entry_text(artist)
-        self.__album_entry.set_readonly_entry_text(album)
-        self.__mode_entry.set_readonly_entry_text(mode)
+    def _set_presets(self, folder_path, artist, album, mode):
+        self._folder_path_entry.set_readonly_entry_text(folder_path)
+        self._artist_entry.set_readonly_entry_text(artist)
+        self._album_entry.set_readonly_entry_text(album)
+        self._mode_entry.set_readonly_entry_text(mode)
 
-    def __reset_wizard_state(self):
-        self.__button_data["start"].place(x=200, y=90)
+    def _reset_wizard_state(self):
+        self._button_data["start"].place(x=200, y=90)
 
-        self.__button_data["label"].place_forget()
-        self.__button_data["back"].place_forget()
-        self.__button_data["next"].place_forget()
-        self.__button_data["finish"].place_forget()
+        self._button_data["label"].place_forget()
+        self._button_data["back"].place_forget()
+        self._button_data["next"].place_forget()
+        self._button_data["finish"].place_forget()
 
-        self.__button_data["title_entry"].hide_entry()
+        self._button_data["title_entry"].hide_entry()
 
-        self.__update_status("Ready")
+        self._update_status("Ready")
 
-    def __set_next_enabled(self, enabled: bool):
+    def _set_next_enabled(self, enabled: bool):
         state = tk.NORMAL if enabled else tk.DISABLED
-        self.__next_button.config(state=state)
+        self._next_button.config(state=state)
 
-    def __set_back_enabled(self, enabled: bool):
+    def _set_back_enabled(self, enabled: bool):
         state = tk.NORMAL if enabled else tk.DISABLED
-        self.__back_button.config(state=state)
+        self._back_button.config(state=state)
 
-    def __show_wizard(self):
-        self.__button_data["start"].place_forget()
+    def _show_wizard(self):
+        self._button_data["start"].place_forget()
 
-        self.__button_data["title_entry"].show_entry()
-        self.__button_data["label"].place(x=50, y=20)
-        self.__button_data["back"].place(x=110, y=90)
-        self.__button_data["next"].place(x=210, y=90)
-        self.__button_data["finish"].place(x=310, y=90)
+        self._button_data["title_entry"].show_entry()
+        self._button_data["label"].place(x=50, y=20)
+        self._button_data["back"].place(x=110, y=90)
+        self._button_data["next"].place(x=210, y=90)
+        self._button_data["finish"].place(x=310, y=90)
 
-    def __update_status(self, status):
-        self.__status_entry.set_readonly_entry_text(status)
+    def _update_status(self, status):
+        self._status_entry.set_readonly_entry_text(status)

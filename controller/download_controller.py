@@ -8,128 +8,139 @@ from service.error_service import ErrorHandlingService
 
 class DownloadController:    
     def __init__(self):
-        self.__youtube_model = YoutubeModel()
-        self.__error = ErrorHandlingService()
+        self._youtube_model = YoutubeModel()
+        self._error = ErrorHandlingService()
 
-        self.__enable_download: Callable = None
-        self.__update_progress: Callable = None
-        self.__update_status: Callable = None
-        self.__cancel_flag = threading.Event()
-        self.__expected_filename = None
+        self._enable_download: Callable = None
+        self._enable_cancel: Callable = None
+        self._update_progress: Callable = None
+        self._update_status: Callable = None
+        self._cancel_flag = threading.Event()
+        self._expected_filename = None
 
     # Public Methods
     def download_requested(
             self, 
             data: dict, 
             path: str, 
-            enable_download: Callable, 
+            enable_download: Callable,
+            enable_cancel: Callable,
             update_progress: Callable, 
             update_status: Callable
     ):
 
-        self.__set_callbacks(enable_download, update_progress, update_status)
-        enable_download(False)
+        self._set_callbacks(enable_download, enable_cancel, update_progress, update_status)
+        self._enable_download(False)
+        self._enable_cancel(True)
 
         url = data.get("url", "")
         mode = data.get("mode", "")
         quality = data.get("quality", "")
 
-        if not self.__validate_data(url, mode):
-            self.__enable_download(True)
+        if not self._validate_data(url, mode):
+            self._enable_download(True)
             return
 
         if mode == 'mp4':
-            self.__request_video_download(url, path, quality)
+            self._request_video_download(url, path, quality)
         else:
-            self.__request_audio_download(url, path, quality)    
+            self._request_audio_download(url, path, quality)    
 
-        self.__update_progress(0)
-        self.__update_status("Downloading")
+        self._update_progress(0)
+        self._update_status("Downloading")
 
     def cancel_download(self):
-        self.__cancel_flag.set()
-        if self.__update_status:
-            self.__update_status("Cancellation requested.....")
+        self._cancel_flag.set()
+        if self._update_status:
+            self._update_status("Cancellation requested.....")
 
     # Private Methods
-    def __set_callbacks(self, enable_download: Callable, update_progress: Callable, update_status: Callable):
-        self.__enable_download: Callable = enable_download
-        self.__update_progress: Callable = update_progress
-        self.__update_status: Callable = update_status
+    def _set_callbacks(
+            self, 
+            enable_download: Callable,
+            enable_cancel: Callable, 
+            update_progress: Callable, 
+            update_status: Callable
+    ):
+        self._enable_download: Callable = enable_download
+        self._enable_cancel: Callable = enable_cancel
+        self._update_progress: Callable = update_progress
+        self._update_status: Callable = update_status
 
-    def __validate_data(self, url: str, mode: str):
+    def _validate_data(self, url: str, mode: str):
         error_msg = DownloadValidator.validate(url, mode)
         if error_msg:
-            self.__error.handle_error(update_status=self.__update_status, custom_msg=error_msg)
+            self._error.handle_error(update_status=self._update_status, custom_msg=error_msg)
             return False
         return True
         
-    def __request_audio_download(self, url: str, folderPath: str, quality: str):
-        thread = threading.Thread(target=self.__run_audio_download, args=(url, folderPath, quality), daemon=True)
+    def _request_audio_download(self, url: str, folderPath: str, quality: str):
+        thread = threading.Thread(target=self._run_audio_download, args=(url, folderPath, quality), daemon=True)
         thread.start()
 
-    def __request_video_download(self, url: str, folderPath: str, quality: str):
-        thread = threading.Thread(target=self.__run_video_download,args=(url, folderPath, quality),daemon=True)
+    def _request_video_download(self, url: str, folderPath: str, quality: str):
+        thread = threading.Thread(target=self._run_video_download,args=(url, folderPath, quality),daemon=True)
         thread.start()
     
-    def __run_audio_download(self, url: str, folderPath: str, quality: str):
+    def _run_audio_download(self, url: str, folderPath: str, quality: str):
         try:
-            self.__youtube_model.audio_download(url=url, 
+            self._youtube_model.audio_download(url=url, 
                                              out_dir=folderPath, 
                                              quality=quality, 
-                                             progress_hook = self.__progress_hook
+                                             progress_hook = self._progress_hook
                                             )
-            self.__update_status("Done")
+            self._update_status("Done")
 
         except Exception as e:
-            if self.__cancel_flag.is_set():
-                self.__cleanup_partial_files()
-            self.__error.handle_error(update_status=self.__update_status, error=e)
+            if self._cancel_flag.is_set():
+                self._cleanup_partial_files()
+            self._error.handle_error(update_status=self._update_status, error=e)
         finally:
-            self.__cancel_flag.clear()
-            self.__enable_download(True)
+            self._cancel_flag.clear()
+            self._enable_download(True)
 
-    def __run_video_download(self, url: str, folderPath: str, quality: str):
+    def _run_video_download(self, url: str, folderPath: str, quality: str):
         try:
-            self.__youtube_model.video_download(
+            self._youtube_model.video_download(
                 url=url,
                 out_dir=folderPath,
                 quality=quality,
-                progress_hook = self.__progress_hook
+                progress_hook = self._progress_hook
             )
-            self.__update_status("Done")
+            self._update_status("Done")
             
         except Exception as e:
-            if self.__cancel_flag.is_set():
-                self.__cleanup_partial_files()
-            self.__error.handle_error(update_status=self.__update_status, error=e)
+            if self._cancel_flag.is_set():
+                self._cleanup_partial_files()
+            self._error.handle_error(update_status=self._update_status, error=e)
         finally:
-            self.__cancel_flag.clear()
-            self.__enable_download(True)
+            self._cancel_flag.clear()
+            self._enable_download(True)
 
-    def __progress_hook(self, d: dict):        
+    def _progress_hook(self, d: dict):        
         if d['status'] == 'downloading':
             if 'filename' in d:
-                self.__expected_filename = d['filename']
+                self._expected_filename = d['filename']
                 
             total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
             downloaded = d.get('downloaded_bytes', 0)
             percent = int((downloaded / total) * 100)
 
-            self.__update_progress(percent)
-            self.__update_status(f"Downloading: {percent}%")
+            self._update_progress(percent)
+            self._update_status(f"Downloading: {percent}%")
 
-            if self.__cancel_flag.is_set():
+            if self._cancel_flag.is_set():
+                self._enable_cancel(False)
                 raise Exception("Download cancelled by user")
         
         elif d['status'] == 'finished':
-            self.__update_status("Processing file...")
+            self._update_status("Processing file...")
 
-    def __cleanup_partial_files(self):
-        if not self.__expected_filename:
+    def _cleanup_partial_files(self):
+        if not self._expected_filename:
             return
         
-        part_file = self.__expected_filename + ".part"
+        part_file = self._expected_filename + ".part"
         
         try:
             if os.path.exists(part_file):

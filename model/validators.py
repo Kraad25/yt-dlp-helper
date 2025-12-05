@@ -8,19 +8,19 @@ class DownloadValidator:
     }
 
     @staticmethod
-    def validate(self, url, mode):
+    def validate(url, mode):
         if not url:
-            return self.ERROR_MESSAGES['url_missing']
+            return DownloadValidator.ERROR_MESSAGES['url_missing']
 
-        if mode not in self.SUPPORTED_MODES:
-            modes_str = ", ".join(self.SUPPORTED_MODES)
-            return self.ERROR_MESSAGES['unsupported_mode'].format(modes_str)
+        if mode not in DownloadValidator.SUPPORTED_MODES:
+            modes_str = ", ".join(DownloadValidator.SUPPORTED_MODES)
+            return DownloadValidator.ERROR_MESSAGES['unsupported_mode'].format(modes_str)
         return None
     
 class FolderValidator:
     @staticmethod
     def validate(folder_path):
-        return not FolderValidator.contains_subfolders(folder_path)
+        return not FolderValidator._contains_subfolders(folder_path)
     
     @staticmethod
     def _contains_subfolders(folder_path):

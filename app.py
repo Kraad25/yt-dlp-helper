@@ -14,11 +14,11 @@ class App:
         self.root = tk.Tk()
         self.theme = AppTheme()
 
-        self.__home_view: HomeView = None
-        self.__metadata_view: MetadataView = None
-        self.__download_controller: DownloadController = None
-        self.__metadata_controller: MetadataController = None
-        self.__folder_controller: FolderController = None
+        self._home_view: HomeView = None
+        self._metadata_view: MetadataView = None
+        self._download_controller: DownloadController = None
+        self._metadata_controller: MetadataController = None
+        self._folder_controller: FolderController = None
 
         self._setup()
 
@@ -67,40 +67,40 @@ class App:
         self.root.configure(menu=menubar)
 
     def _initialize_views(self):
-        self.__home_view = HomeView(self.root)
-        self.__metadata_view = MetadataView(self.root)
+        self._home_view = HomeView(self.root)
+        self._metadata_view = MetadataView(self.root)
 
-        for view in (self.__home_view, self.__metadata_view):
+        for view in (self._home_view, self._metadata_view):
             view.place(x=0, y=0, width=560, height=600)
             view.pack_propagate(False)
 
     def _initialize_controllers(self):
-        self.__download_controller = DownloadController()
-        self.__folder_controller = FolderController(self.__home_view.set_base_folder_path)
-        self.__metadata_controller = MetadataController()
+        self._download_controller = DownloadController()
+        self._folder_controller = FolderController(self._home_view.set_base_folder_path)
+        self._metadata_controller = MetadataController()
 
     def _wire_controllers_to_views(self):
-        self.__home_view.set_controllers(
-            download_controller=self.__download_controller,
-            folder_controller=self.__folder_controller,
+        self._home_view.set_controllers(
+            download_controller=self._download_controller,
+            folder_controller=self._folder_controller,
             metadata_callback=self._show_metadata
         )
 
-        self.__metadata_view.set_controllers(
-            metadata_controller=self.__metadata_controller,
-            folder_controller=self.__folder_controller,
+        self._metadata_view.set_controllers(
+            metadata_controller=self._metadata_controller,
+            folder_controller=self._folder_controller,
             home_callback=self._show_home
         )
 
-        self.__home_view.set_cancel_callback(self.__download_controller.cancel_download)
+        self._home_view.set_cancel_callback(self._download_controller.cancel_download)
 
     def _show_home(self):
-        self.__home_view.tkraise()
+        self._home_view.tkraise()
 
     def _show_metadata(self, data: dict):
         folder_path = data.get("path", "")
-        self.__metadata_view.reset(data, folder_path)
-        self.__metadata_view.tkraise()
+        self._metadata_view.reset(data, folder_path)
+        self._metadata_view.tkraise()
 
     def _show_about(self):
         messagebox.showinfo(
