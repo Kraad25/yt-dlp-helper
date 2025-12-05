@@ -33,7 +33,9 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 After installing all dependencies and adding FFmpeg/ffprobe to your PATH:
 
 From the project root, run:
-<pre> ```bash python app.py ``` </pre>
+```bash
+python app.py
+```
 
 This will start the Tkinter GUI.
 
