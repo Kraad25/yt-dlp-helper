@@ -27,3 +27,13 @@ Download a Windows build from [here](https://github.com/yt-dlp/FFmpeg-Builds/wik
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+## Running
+
+After installing all dependencies and adding FFmpeg/ffprobe to your PATH:
+
+From the project root, run:
+<pre> ```bash python app.py ``` </pre>
+
+This will start the Tkinter GUI.
+
