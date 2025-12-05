@@ -105,6 +105,6 @@ class MetadataService:
         update_status: Callable,
     ):
         try:
-            self._model.set_video_metadata(file_path, title, artist, album)
+            self._model.set_video_metadata(file_path, title, artist)
         except Exception as e:
             self._error.handle_error(update_status, error=e)
