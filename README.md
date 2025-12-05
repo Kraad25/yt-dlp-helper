@@ -21,7 +21,7 @@ A simple desktop app to download YouTube videos or audio and edit their metadata
     - `Title`
 
 ## Prerequisites
-FFmpeg and ffprobe must be installed to download and process videos.  
+FFmpeg and ffprobe must be installed to download and process media.  
 Download a Windows build from [here](https://github.com/yt-dlp/FFmpeg-Builds/wiki/Latest) or install via your OS package manager.
 
 ## License
@@ -30,7 +30,7 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 
 ## Running
 
-After installing all dependencies and adding FFmpeg/ffprobe to your PATH:
+After installing all dependencies and adding ffmpeg's `bin` to your PATH:
 
 From the project root, run:
 ```bash
