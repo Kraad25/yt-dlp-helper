@@ -9,9 +9,9 @@ class CustomComboBox:
         self.posy = posy
         self.width=width
         
-        self._var = tk.StringVar(value="192")
+        self._var = tk.StringVar(value="192 kbps")
     
-        self.AUDIO_QUALITIES = ["128", "192", "256", "320"]
+        self.AUDIO_QUALITIES = ["128 kbps", "192 kbps", "256 kbps", "320 kbps"]
         self.VIDEO_QUALITIES = ["360p", "480p", "720p", "1080p", "2K", "4K"]
         
     def make_combobox(self):

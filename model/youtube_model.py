@@ -2,7 +2,9 @@ import yt_dlp
 import os
 
 class YoutubeModel:
-    def audio_download(self, url, out_dir, quality='192', progress_hook=None):
+    def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None):
+        quality_value = quality.split()[0]  # "192 kbps" -> "192"
+
         ydl_opts = {
             'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
             'quiet': True,
@@ -12,7 +14,7 @@ class YoutubeModel:
                 {
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
-                    'preferredquality': quality,
+                    'preferredquality': quality_value,
                 },
                 {
                     'key': 'FFmpegMetadata',
