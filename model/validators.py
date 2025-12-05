@@ -7,6 +7,7 @@ class DownloadValidator:
         'unsupported_mode': "Error: Unsupported mode. Supported: {}"
     }
 
+    @staticmethod
     def validate(self, url, mode):
         if not url:
             return self.ERROR_MESSAGES['url_missing']
@@ -17,8 +18,10 @@ class DownloadValidator:
         return None
     
 class FolderValidator:
-    def validate(self, folder_path):
-        return not self._contains_subfolders(folder_path)
+    @staticmethod
+    def validate(folder_path):
+        return not FolderValidator.contains_subfolders(folder_path)
     
-    def _contains_subfolders(self, folder_path):
+    @staticmethod
+    def _contains_subfolders(folder_path):
         return any(os.path.isdir(os.path.join(folder_path, f)) for f in os.listdir(folder_path))

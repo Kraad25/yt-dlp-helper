@@ -9,7 +9,6 @@ from service.metadata_service import MetadataService
 
 class MetadataController:
     def __init__(self):
-        self.__metadata_editing_folder = FolderValidator()
         self.__error = ErrorHandlingService()
         self.__service = MetadataService(metadata_model=MetadataModel(), error_handler=self.__error)
 
@@ -139,7 +138,7 @@ class MetadataController:
         self.__update_status: Callable = update_status
 
     def __validate_folder(self, folder, files):
-        if not self.__metadata_editing_folder.validate(folder):
+        if not FolderValidator.validate(folder):
             self.__error.handle_error(update_status=self.__update_status,
                                     custom_msg="Error: Folder contains Subfolders")
             return False

@@ -9,7 +9,6 @@ from service.error_service import ErrorHandlingService
 class DownloadController:    
     def __init__(self):
         self.__youtube_model = YoutubeModel()
-        self.__validator = DownloadValidator()
         self.__error = ErrorHandlingService()
 
         self.__enable_download: Callable = None
@@ -59,7 +58,7 @@ class DownloadController:
         self.__update_status: Callable = update_status
 
     def __validate_data(self, url: str, mode: str):
-        error_msg = self.__validator.validate(url, mode)
+        error_msg = DownloadValidator.validate(url, mode)
         if error_msg:
             self.__error.handle_error(update_status=self.__update_status, custom_msg=error_msg)
             return False
