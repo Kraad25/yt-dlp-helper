@@ -12,5 +12,6 @@
 *.pyc
 *.bat
 *.ico
+*.spec
 
 !requirements.txt

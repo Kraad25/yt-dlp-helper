@@ -34,7 +34,7 @@ class App:
         self._show_home()
         
         try:
-            self.root.iconbitmap('skull.ico')
+            self.root.iconbitmap('flag.ico')
         except Exception:
             pass
 

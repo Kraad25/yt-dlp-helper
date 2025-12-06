@@ -54,4 +54,5 @@ class FolderController:
                 self._set_base_folder(folder_path)
             else:
                 default_path = os.path.expanduser("~/Documents")
+                default_path = default_path.replace("\\", "/")
                 self._set_base_folder(default_path)

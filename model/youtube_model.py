@@ -1,7 +1,18 @@
 import yt_dlp
 import os
+import sys
+from pathlib import Path
+
+def _get_app_root() -> Path:
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent.parent
 
 class YoutubeModel:
+    def __init__(self):
+        app_root = _get_app_root()
+        self._ffmpeg_dir = app_root / "ffmpeg"
+
     def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None):
         quality_value = quality.split()[0]  # "192 kbps" -> "192"
 
@@ -10,6 +21,7 @@ class YoutubeModel:
             'quiet': True,
             'no_warnings': True,
             'format': 'bestaudio/best',
+            'ffmpeg_location': str(self._ffmpeg_dir),
             'postprocessors': [
                 {
                     'key': 'FFmpegExtractAudio',
@@ -41,6 +53,7 @@ class YoutubeModel:
             'quiet': True,
             'no_warnings': True,
             'format': f'bestvideo[height<={height}]+bestaudio/best/best',
+            'ffmpeg_location': str(self._ffmpeg_dir),
             'postprocessors': [
                 {'key': 'FFmpegMetadata'},
                 {'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}

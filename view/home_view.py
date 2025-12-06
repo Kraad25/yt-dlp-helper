@@ -143,7 +143,7 @@ class HomeView(BaseView):
     def _create_header(self):
         label = ttk.Label(
             self,
-            text="Youtube Converter",
+            text="Media Converter",
             font=("Helvetica", 16),
             background=self._theme.get_background_color()
         ).place(x=195, y=20)
