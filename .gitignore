@@ -13,5 +13,14 @@
 *.bat
 *.ico
 *.spec
+*.toc
+*.zip
+*.pkg
+*.pyd
+*.pyz
+*.tcl
+*.enc
+*.msg
+dist/
 
 !requirements.txt
