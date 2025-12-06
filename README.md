@@ -30,7 +30,10 @@ Unzip the archive and run `Media-Downloader.exe`.
 
 ## Prerequisites
 To run from source (macOS/Linux/Windows), FFmpeg and ffprobe must be installed to download and process media.
-Download a Windows build from [here](https://github.com/yt-dlp/FFmpeg-Builds/wiki/Latest) or install via your OS package manager.
+You can either:
+
+- Install FFmpeg via your OS package manager, or
+- Download a static FFmpeg build from [here](https://github.com/yt-dlp/FFmpeg-Builds/wiki/Latest) and place `ffmpeg.exe` and `ffprobe.exe` in a `ffmpeg` folder next to `app.py`.
 
 ## License
 
@@ -44,5 +47,7 @@ From the project root, run:
 ```bash
 python app.py
 ```
+
+By default, the app looks for FFmpeg in a `ffmpeg` folder next to `app.py`. If you prefer using a global FFmpeg installation instead, ensure it’s on your PATH and remove the `ffmpeg_location` option in `YoutubeModel`.
 
 This will start the Tkinter GUI.
