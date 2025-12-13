@@ -48,18 +48,20 @@ class YoutubeModel:
             "4K": 2160,
         }
         height = quality_map.get(quality, 720)
+        
         ydl_opts = {
             'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
-            'format': f'bestvideo[height<={height}]+bestaudio/best/best',
             'ffmpeg_location': str(self._ffmpeg_dir),
+            'format': f'bestvideo[ext=mp4][height<={height}]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'merge_output_format': 'mp4',
             'postprocessors': [
                 {'key': 'FFmpegMetadata'},
-                {'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}
             ]
         }
         if progress_hook:
             ydl_opts['progress_hooks'] = [progress_hook]
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
