@@ -3,15 +3,10 @@ import os
 import sys
 from pathlib import Path
 
-def _get_app_root() -> Path:
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent.parent
 
 class YoutubeModel:
-    def __init__(self):
-        app_root = _get_app_root()
-        self._ffmpeg_dir = app_root / "ffmpeg"
+    def __init__(self, ffmpeg_dir: Path= None):
+        self._ffmpeg_dir = ffmpeg_dir
 
     def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None):
         quality_value = quality.split()[0]  # "192 kbps" -> "192"
@@ -39,6 +34,8 @@ class YoutubeModel:
             ydl.download([url])
 
     def video_download(self, url, out_dir, quality='720p', progress_hook=None):
+        downloaded_file = None
+
         quality_map = {
             "360p": 360,
             "480p": 480,
@@ -65,3 +62,5 @@ class YoutubeModel:
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+            downloaded_file = ydl.prepare_filename(ydl.extract_info(url, download=False))
+        return downloaded_file

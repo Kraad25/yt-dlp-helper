@@ -1,14 +1,27 @@
 import os
+import sys
 import threading
 from typing import Callable
+from pathlib import Path
 
 from model.validators import DownloadValidator
 from model.youtube_model import YoutubeModel
 from service.error_service import ErrorHandlingService
+from service.video_processing_service import VideoProcessingService
+
+
+def _get_app_root() -> Path:
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent.parent
 
 class DownloadController:    
     def __init__(self):
-        self._youtube_model = YoutubeModel()
+        app_root = _get_app_root()
+        self._ffmpeg_dir = app_root / "ffmpeg"
+        
+        self._youtube_model = YoutubeModel(self._ffmpeg_dir)
+        self._video_processor = VideoProcessingService(self._ffmpeg_dir)
         self._error = ErrorHandlingService()
 
         self._enable_download: Callable = None
@@ -101,12 +114,14 @@ class DownloadController:
 
     def _run_video_download(self, url: str, folderPath: str, quality: str):
         try:
-            self._youtube_model.video_download(
+            downloaded_file = self._youtube_model.video_download(
                 url=url,
                 out_dir=folderPath,
                 quality=quality,
                 progress_hook = self._progress_hook
             )
+            if downloaded_file and not self._cancel_flag.is_set():
+                self._video_processor.transcode(downloaded_file)
             self._update_status("Done")
             
         except Exception as e:
