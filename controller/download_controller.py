@@ -30,12 +30,14 @@ class DownloadController:
         self._update_status: Callable = None
         self._cancel_flag = threading.Event()
         self._expected_filename = None
+        self._encoder = "CPU"
 
     # Public Methods
     def download_requested(
             self, 
             data: dict, 
-            path: str, 
+            path: str,
+            encoder: str, 
             enable_download: Callable,
             enable_cancel: Callable,
             update_progress: Callable, 
@@ -45,6 +47,7 @@ class DownloadController:
         self._set_callbacks(enable_download, enable_cancel, update_progress, update_status)
         self._enable_download(False)
         self._enable_cancel(True)
+        self._encoder = encoder
 
         url = data.get("url", "")
         mode = data.get("mode", "")
@@ -121,7 +124,7 @@ class DownloadController:
                 progress_hook = self._progress_hook
             )
             if downloaded_file and not self._cancel_flag.is_set():
-                self._video_processor.transcode(downloaded_file)
+                self._video_processor.transcode(downloaded_file,self._encoder)
             self._update_status("Done")
             
         except Exception as e:
@@ -161,4 +164,7 @@ class DownloadController:
             if os.path.exists(part_file):
                 os.remove(part_file)
         except Exception as e:
-            print(f"Warning: Could not delete temp file: {e}")
+            self._error.handle_error(
+                update_status = self._update_status,
+                custom_msg = f"Warning: Could not delete temp file: {e}"   
+            )

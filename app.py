@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
-import tkinter.ttk as ttk
+
 from view.theme import AppTheme
 from view.home_view import HomeView
 from view.metadata_view import MetadataView
@@ -8,6 +8,8 @@ from view.metadata_view import MetadataView
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
 from controller.metadata_controller import MetadataController
+
+from service.encoder_test_service import EncoderTestService
 
 class App:
     def __init__(self):
@@ -19,6 +21,9 @@ class App:
         self._download_controller: DownloadController = None
         self._metadata_controller: MetadataController = None
         self._folder_controller: FolderController = None
+
+        self._encoder_var = tk.StringVar(value="CPU")
+        self._available_encoders: list[dict] = []
 
         self._setup()
 
@@ -32,6 +37,9 @@ class App:
         self._initialize_controllers()
         self._wire_controllers_to_views()
         self._show_home()
+
+        tester = EncoderTestService()
+        tester.list_available_encoder(self._on_encoders_detected)
         
         try:
             self.root.iconbitmap('flag.ico')
@@ -64,17 +72,55 @@ class App:
         menubar.add_cascade(label="About", menu=about_menu)
         about_menu.add_command(label="About", command=self._show_about)
 
-        settings_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Settings", menu=settings_menu)
-        settings_menu.add_command(label="Preferences", command=self._show_settings)
+        self._settings_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Settings", menu=self._settings_menu)
 
+        # Encoder submenu
+        self._encoder_menu = tk.Menu(self._settings_menu, tearoff=0)
+        self._settings_menu.add_cascade(label="Video encoder", menu=self._encoder_menu)
+
+        self._encoder_menu.add_radiobutton(
+            label="CPU (default)",
+            variable=self._encoder_var,
+            value="CPU",
+            command=self._on_encoder_selected,
+        )
         self.root.configure(menu=menubar)
+
+    def _on_encoders_detected(self, encoders: list):
+        self._available_encoders = encoders
+
+        self._encoder_menu.delete(0, 'end')
+
+        if not encoders:
+            self._encoder_var.set("CPU")
+            self._encoder_menu.add_radiobutton(
+                label="CPU (default)",
+                variable=self._encoder_var,
+                value="CPU",
+                command=self._on_encoder_selected,
+            )
+            return
+
+        for info in encoders:
+            encoder_type = info["type"]  # "QSV" / "NVENC" / "AMF" / "CPU"
+            label = f"{info.get('name', '')}"
+            self._encoder_menu.add_radiobutton(
+                label=label,
+                variable=self._encoder_var,
+                value=encoder_type,
+                command=lambda: self._on_encoder_selected(info["type"]),
+            )
+
+        first_type = encoders[0]["type"]
+        self._encoder_var.set(first_type)
+        self._on_encoder_selected(first_type)
 
     def _initialize_views(self):
         self._home_view = HomeView(self.root)
         self._metadata_view = MetadataView(self.root)
 
-        for view in (self._home_view, self._metadata_view):
+        for view in (self._home_view, self._metadata_view,):
             view.place(x=0, y=0, width=560, height=600)
             view.pack_propagate(False)
 
@@ -115,8 +161,8 @@ class App:
             "which is licensed under the Unlicense."
         )
 
-    def _show_settings(self):
-        pass
+    def _on_encoder_selected(self, encoder_type: str = "CPU"):
+        self._home_view.set_video_encoder(encoder_type)
 
 
 if __name__ == "__main__":

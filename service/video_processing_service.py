@@ -4,12 +4,14 @@ import subprocess
 from pathlib import Path
 
 class VideoProcessingService:
-    def __init__(self, ffmpeg_dir: Path, mode: str = 'qsv'):   
+    def __init__(self, ffmpeg_dir: Path, encoder: str = 'QSV'):   
         self._ffmpeg_dir = ffmpeg_dir
         self._ffprobe_path = self._ffmpeg_dir / 'ffprobe.exe'
-        self._mode = mode # "qsv", "nvenc", "cpu"
+        self._encoder = encoder # "qsv", "nvenc", "cpu", "amf"
 
-    def transcode(self, input_file: str) -> None:
+    def transcode(self, input_file: str, encoder: str) -> None:
+        self._encoder = encoder
+        
         try:
             if self._is_h264_video(input_file):
                 return
@@ -74,11 +76,11 @@ class VideoProcessingService:
         ]
 
     def _build_video_encoder_args(self) -> list:
-        if self._mode == 'qsv': # Intel QSV
+        if self._encoder == 'QSV': # Intel QSV
             return ['-c:v', 'h264_qsv', '-preset', 'fast', '-global_quality', '18']
-        elif self._mode == 'nvenc': # NVIDIA GPU
+        elif self._encoder == 'NVENC': # NVIDIA GPU
             return ['-c:v', 'h264_nvenc', '-preset', 'fast', '-cq', '18']
-        elif self._mode == 'amf': # AMD AMF
+        elif self._encoder == 'AMF': # AMD AMF
             return [
                 '-c:v', 'h264_amf',
                 '-quality', 'balanced',

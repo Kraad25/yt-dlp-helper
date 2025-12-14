@@ -34,6 +34,7 @@ class HomeView(BaseView):
 
         self._show_metadata: Callable = None
         self._on_cancel: Callable = None
+        self._video_encoder: str = "CPU"
 
         super().__init__(parent)
 
@@ -59,6 +60,9 @@ class HomeView(BaseView):
         if self._cancel_button:
             self._cancel_button.config(state=state)
 
+    def set_video_encoder(self, encoder: str):
+        self._video_encoder = encoder
+
     def update_progress(self, value: int):
         if self._progress_bar:
             self._progress_bar['value'] = value
@@ -75,6 +79,7 @@ class HomeView(BaseView):
         self._download_controller.download_requested(
             data,
             path,
+            self._video_encoder,
             self.set_download_enabled,
             self.set_cancel_enabled,
             self.update_progress,
