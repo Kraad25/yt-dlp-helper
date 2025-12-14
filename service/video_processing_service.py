@@ -4,16 +4,19 @@ import subprocess
 from pathlib import Path
 
 class VideoProcessingService:
-    def __init__(self, ffmpeg_dir: Path):   
+    def __init__(self, ffmpeg_dir: Path, mode: str = 'qsv'):   
         self._ffmpeg_dir = ffmpeg_dir
         self._ffprobe_path = self._ffmpeg_dir / 'ffprobe.exe'
+        self._mode = mode # "qsv", "nvenc", "cpu"
 
     def transcode(self, input_file: str) -> None:
-        print("Hello")
         try:
             if self._is_h264_video(input_file):
                 return
-            self._transcode_to_h264_qsv(input_file)
+            
+            encoder_args = self._build_video_encoder_args()
+            self._transcode_with_encoder(input_file, encoder_args)
+
         except Exception as e:
             raise Exception(f"Transcoding Failed: {e}")
 
@@ -25,28 +28,20 @@ class VideoProcessingService:
         except:
             return False # Assumes needs transcoding on error
         
-    def _transcode_to_h264_qsv(self, input_file: str) -> None:
+    def _transcode_with_encoder(self, input_file: str, encoder_args: list) -> None:
         input_path = Path(input_file)
         temp_output = input_path.with_stem(f"{input_path.stem}_temp")
 
         cmd = [
-            str(self._ffmpeg_dir / 'ffmpeg.exe'),
-            '-y',
-            '-i', str(input_path),
-
-            # Include first video + first audio stream
-            '-map', '0:v:0',
-            '-map', '0:a:0?',
-
-            # Video → H.264 (QSV)
-            '-c:v', 'h264_qsv',
-            '-preset', 'veryfast',
-            '-global_quality', '23',
-
-            # Audio → copy unchanged
-            '-c:a', 'copy',
-
-            '-movflags', '+faststart',
+            str(self._ffmpeg_dir / "ffmpeg.exe"),
+            "-y",
+            "-i", str(input_path),
+            "-map", "0:v:0",
+            "-map", "0:a:0?",
+            *encoder_args,           
+            "-c:a", "aac",           
+            "-b:a", "192k",
+            "-movflags", "+faststart",
             str(temp_output),
         ]
 
@@ -77,3 +72,21 @@ class VideoProcessingService:
             '-of', 'json',
             input_file
         ]
+
+    def _build_video_encoder_args(self) -> list:
+        if self._mode == 'qsv': # Intel QSV
+            return ['-c:v', 'h264_qsv', '-preset', 'fast', '-global_quality', '18']
+        elif self._mode == 'nvenc': # NVIDIA GPU
+            return ['-c:v', 'h264_nvenc', '-preset', 'fast', '-cq', '18']
+        elif self._mode == 'amf': # AMD AMF
+            return [
+                '-c:v', 'h264_amf',
+                '-quality', 'balanced',
+                '-rc', 'cqp',
+                '-qp_i', '18',
+                '-qp_p', '18',
+                '-qp_b', '18'
+            ]
+        
+        else:  # CPU
+            return ['-c:v', 'libx264', '-preset', 'fast', '-crf', '23']

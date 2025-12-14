@@ -281,9 +281,9 @@ class HomeView(BaseView):
             text="Status: ",
             background=self._theme.get_background_color(),
             font=("Segoe UI", 12, "italic")
-        ).place(x=163, y=477)
+        ).place(x=108, y=477)
 
-        status_entry = CustomEntry(self, width=20, posx=213, posy=480)
+        status_entry = CustomEntry(self, width=40, posx=158, posy=480)
         status_entry.make_entry()
 
         return progress_bar, status_entry

@@ -64,6 +64,10 @@ class App:
         menubar.add_cascade(label="About", menu=about_menu)
         about_menu.add_command(label="About", command=self._show_about)
 
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Settings", menu=settings_menu)
+        settings_menu.add_command(label="Preferences", command=self._show_settings)
+
         self.root.configure(menu=menubar)
 
     def _initialize_views(self):
@@ -110,6 +114,9 @@ class App:
             "(https://github.com/yt-dlp/yt-dlp)"
             "which is licensed under the Unlicense."
         )
+
+    def _show_settings(self):
+        pass
 
 
 if __name__ == "__main__":
