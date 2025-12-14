@@ -41,13 +41,12 @@ class VideoProcessingService:
             "-map", "0:v:0",
             "-map", "0:a:0?",
             *encoder_args,           
-            "-c:a", "aac",           
-            "-b:a", "192k",
+            '-c:a', 'copy',
             "-movflags", "+faststart",
             str(temp_output),
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True)
 
         if result.returncode != 0:
             temp_output.unlink(missing_ok=True)
@@ -58,7 +57,7 @@ class VideoProcessingService:
         
     def _probe_video_stream(self, input_file: str) -> dict:
         cmd = self._build_probe_cmd(input_file)
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        
         if result.returncode != 0:
             raise RuntimeError("Probe failed")

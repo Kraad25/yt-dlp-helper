@@ -124,6 +124,7 @@ class DownloadController:
                 progress_hook = self._progress_hook
             )
             if downloaded_file and not self._cancel_flag.is_set():
+                self._update_status("Transcoding video...")
                 self._video_processor.transcode(downloaded_file,self._encoder)
             self._update_status("Done")
             
