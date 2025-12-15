@@ -9,6 +9,9 @@ def _get_app_root() -> Path:
         return Path(sys._MEIPASS)
     return Path(__file__).resolve().parent.parent
 
+si = subprocess.STARTUPINFO()
+si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
 class EncoderTestService:
     def __init__(self):
         app_root = _get_app_root()
@@ -41,5 +44,5 @@ class EncoderTestService:
             str(self._ffmpeg_path), '-f', 'lavfi', '-i', 'nullsrc',
             '-c:v', encoder, '-frames:v', '1', '-f', 'null', '-'
         ]
-        result = subprocess.run(cmd, capture_output=True, timeout=5)
+        result = subprocess.run(cmd, capture_output=True, timeout=5, startupinfo=si)
         return result.returncode == 0

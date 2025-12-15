@@ -3,6 +3,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+si = subprocess.STARTUPINFO()
+si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 class VideoProcessingService:
     def __init__(self, ffmpeg_dir: Path, encoder: str = 'QSV'):   
         self._ffmpeg_dir = ffmpeg_dir
@@ -46,7 +48,7 @@ class VideoProcessingService:
             str(temp_output),
         ]
 
-        result = subprocess.run(cmd, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, startupinfo=si)
 
         if result.returncode != 0:
             temp_output.unlink(missing_ok=True)
@@ -57,7 +59,7 @@ class VideoProcessingService:
         
     def _probe_video_stream(self, input_file: str) -> dict:
         cmd = self._build_probe_cmd(input_file)
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=si)
        
         if result.returncode != 0:
             raise RuntimeError("Probe failed")
