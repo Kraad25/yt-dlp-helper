@@ -11,7 +11,7 @@ from controller.metadata_controller import MetadataController
 
 from service.encoder_test_service import EncoderTestService
 
-VERSION = "1.2.1"
+VERSION = "1.1.1"
 
 class App:
     def __init__(self):
