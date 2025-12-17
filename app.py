@@ -11,6 +11,8 @@ from controller.metadata_controller import MetadataController
 
 from service.encoder_test_service import EncoderTestService
 
+VERSION = "1.2.1"
+
 class App:
     def __init__(self):
         self.root = tk.Tk()
@@ -47,7 +49,7 @@ class App:
             pass
 
     def _setup_window(self):
-        self.root.title("YouTube Converter v1.0")
+        self.root.title(f"Media Downloader {VERSION}")
         self.root.resizable(False, False)
 
         window_width = 560
@@ -155,10 +157,11 @@ class App:
     def _show_about(self):
         messagebox.showinfo(
             "About",
-            "YouTube Converter v1.0\n\n"
-            "This program uses yt-dlp "
-            "(https://github.com/yt-dlp/yt-dlp)"
-            "which is licensed under the Unlicense."
+            f"YouTube Converter {VERSION}\n\n"
+            "This program uses yt-dlp for downloading and processing media.\n"
+            "Project page and supported sites:\n"
+            "https://github.com/yt-dlp/yt-dlp\n\n"
+            "See the yt-dlp repository for full licensing information."
         )
 
     def _on_encoder_selected(self, encoder_type: str = "CPU"):
