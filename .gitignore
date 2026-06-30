@@ -22,5 +22,6 @@
 *.enc
 *.msg
 dist/
+libs/
 
 !requirements.txt

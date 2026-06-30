@@ -1,3 +1,16 @@
+import sys
+from pathlib import Path
+
+def _bootstrap_libs_path():
+    if getattr(sys, "frozen", False):
+        app_root = Path(sys.executable).resolve().parent
+    else:
+        app_root = Path(__file__).resolve().parent
+    libs_dir = app_root / "libs"
+    sys.path.insert(0, str(libs_dir))
+
+_bootstrap_libs_path()
+
 import tkinter as tk
 from tkinter import messagebox
 
@@ -8,10 +21,11 @@ from view.metadata_view import MetadataView
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
 from controller.metadata_controller import MetadataController
+from controller.update_controller import UpdateController
 
 from service.encoder_test_service import EncoderTestService
 
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 
 class App:
     def __init__(self):
@@ -23,6 +37,7 @@ class App:
         self._download_controller: DownloadController = None
         self._metadata_controller: MetadataController = None
         self._folder_controller: FolderController = None
+        self._update_controller: UpdateController = None
 
         self._encoder_var = tk.StringVar(value="CPU")
         self._available_encoders: list[dict] = []
@@ -68,6 +83,8 @@ class App:
 
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Update", command=self._check_for_updates)
+        file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
 
         about_menu = tk.Menu(menubar, tearoff=0)
@@ -130,6 +147,7 @@ class App:
         self._download_controller = DownloadController()
         self._folder_controller = FolderController(self._home_view.set_base_folder_path)
         self._metadata_controller = MetadataController()
+        self._update_controller = UpdateController()
 
     def _wire_controllers_to_views(self):
         self._home_view.set_controllers(
@@ -164,8 +182,19 @@ class App:
             "See the yt-dlp repository for full licensing information."
         )
 
+    def _check_for_updates(self):        
+        self._home_view.update_status("Checking and Updating")
+        self._metadata_view.update_status("Checking and Updating")
+
+        self._update_controller.update_program(update_status = self._change_status_for_updates)
+
+    def _change_status_for_updates(self, message):
+        self._home_view.update_status(message)
+        self._metadata_view.update_status(message)
+
     def _on_encoder_selected(self, encoder_type: str = "CPU"):
         self._home_view.set_video_encoder(encoder_type)
+
 
 
 if __name__ == "__main__":

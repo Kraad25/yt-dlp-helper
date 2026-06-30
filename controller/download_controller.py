@@ -11,14 +11,19 @@ from service.video_processing_service import VideoProcessingService
 
 
 def _get_app_root() -> Path:
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
+
+def _get_ffmpeg_dir(app_root) -> Path:
+    if getattr(sys, "frozen", False):
+        return app_root / "_internals" / "ffmpeg"
+    return app_root / "ffmpeg"
 
 class DownloadController:    
     def __init__(self):
         app_root = _get_app_root()
-        self._ffmpeg_dir = app_root / "ffmpeg"
+        self._ffmpeg_dir = _get_ffmpeg_dir(app_root)
         
         self._youtube_model = YoutubeModel(self._ffmpeg_dir)
         self._video_processor = VideoProcessingService(self._ffmpeg_dir)

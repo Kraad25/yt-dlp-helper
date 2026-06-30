@@ -49,6 +49,9 @@ class MetadataView(BaseView):
     def set_title(self, title):
         self._title_entry.set_entry_text(title)
 
+    def update_status(self, status):
+        self._status_entry.set_readonly_entry_text(status)
+
     # Event Handler
     def _on_home_clicked(self):
         self._show_home()
@@ -64,7 +67,7 @@ class MetadataView(BaseView):
             data,
             self.set_title,
             self._show_wizard,
-            self._update_status,
+            self.update_status,
             self._set_next_enabled,
             self._set_back_enabled,
         )
@@ -312,7 +315,7 @@ class MetadataView(BaseView):
 
         self._button_data["title_entry"].hide_entry()
 
-        self._update_status("Ready")
+        self.update_status("Ready")
 
     def _set_next_enabled(self, enabled: bool):
         state = tk.NORMAL if enabled else tk.DISABLED
@@ -330,6 +333,3 @@ class MetadataView(BaseView):
         self._button_data["back"].place(x=110, y=90)
         self._button_data["next"].place(x=210, y=90)
         self._button_data["finish"].place(x=310, y=90)
-
-    def _update_status(self, status):
-        self._status_entry.set_readonly_entry_text(status)
