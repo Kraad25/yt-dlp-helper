@@ -29,7 +29,7 @@ class UpdateController:
     
     def _get_ffmpeg_dir(self) -> Path:
         if getattr(sys, "frozen", False):
-            return self._app_root / "_internals" / "ffmpeg"
+            return self._app_root / "_internal" / "ffmpeg"
         return self._app_root / "ffmpeg"
     
     def _update_yt_dlp(self, update_status: Callable) -> bool:

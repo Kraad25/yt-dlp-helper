@@ -17,7 +17,7 @@ def _get_app_root() -> Path:
 
 def _get_ffmpeg_dir(app_root) -> Path:
     if getattr(sys, "frozen", False):
-        return app_root / "_internals" / "ffmpeg"
+        return app_root / "_internal" / "ffmpeg"
     return app_root / "ffmpeg"
 
 class DownloadController:    

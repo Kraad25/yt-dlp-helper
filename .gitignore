@@ -23,5 +23,7 @@
 *.msg
 dist/
 libs/
+python-embed/
 
+get-pip.py
 !requirements.txt
