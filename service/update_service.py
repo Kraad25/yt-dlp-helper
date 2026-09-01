@@ -8,7 +8,7 @@ import urllib.request
 from typing import Callable
 from pathlib import Path
 
-class UpdateController:
+class UpdateService:
     def __init__(self):
         self._app_root = self._get_app_root()
         self._libs_dir = self._app_root / "libs"

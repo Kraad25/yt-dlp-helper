@@ -22,8 +22,6 @@ class HomeView(BaseView):
         self._url_entry = None
         self._base_folder_entry = None
         self._subfolder_entry = None
-        self._artist_entry = None
-        self._album_entry = None
         self._progress_bar = None
         self._status_entry = None
         self._quality_selector = None
@@ -32,17 +30,15 @@ class HomeView(BaseView):
         self._download_controller: DownloadController = None
         self._folder_controller: FolderController = None
 
-        self._show_metadata: Callable = None
         self._on_cancel: Callable = None
         self._video_encoder: str = "CPU"
 
         super().__init__(parent)
 
     # Public Methods
-    def set_controllers(self, download_controller, folder_controller, metadata_callback: Callable):
+    def set_controllers(self, download_controller, folder_controller):
         self._download_controller = download_controller
         self._folder_controller = folder_controller
-        self._show_metadata = metadata_callback
 
     def set_cancel_callback(self, callback: Callable):
         self._on_cancel = callback
@@ -86,10 +82,6 @@ class HomeView(BaseView):
             self.update_status
         )
 
-    def _on_metadata_clicked(self):
-        data = self._get_form_data()
-        self._show_metadata(data)
-
     def _on_browse_clicked(self):
         self._folder_controller.browse_folder()
 
@@ -104,10 +96,6 @@ class HomeView(BaseView):
     def _on_reset_clicked(self):
         if self._url_entry:
             self._url_entry.set_entry_text("")
-        if self._artist_entry:
-            self._artist_entry.set_entry_text("")
-        if self._album_entry:
-            self._album_entry.set_entry_text("")
 
         self._mode_var.set(Mode.MP3)
         self.update_progress(0)
@@ -138,9 +126,8 @@ class HomeView(BaseView):
         self._subfolder_entry = self._create_subfolder_input()
         self._mp3_radio, self._mp4_radio = self._create_mode_section()
         self._quality_selector = self._create_quality_section()
-        self._metadata_frame, self._artist_entry, self._album_entry = self._create_metadata_section()
         self._progress_bar, self._status_entry = self._create_progress_section()
-        self._download_button, self._metadata_button, self._cancel_button, self._reset_button = self._create_action_buttons()
+        self._download_button, self._cancel_button, self._reset_button = self._create_action_buttons()
 
         self.set_cancel_enabled(False)
         self.update_status("Ready")
@@ -244,39 +231,6 @@ class HomeView(BaseView):
 
         return quality_selector
 
-    def _create_metadata_section(self):
-        metadata_frame = tk.LabelFrame(
-            self,
-            text="Metadata (Optional)",
-            width=500,
-            height=150,
-            bg=self._theme.get_secondary_color(),
-            fg="black",
-            font=("Arial", 10, "italic bold"),
-            bd=5,
-            relief="ridge"
-        )
-        metadata_frame.place(x=30, y=277)
-        metadata_frame.pack_propagate(False)
-
-        ttk.Label(metadata_frame, text="Artist :", background=self._theme.get_secondary_color()).place(
-            x=20, y=20
-        )
-        artist_entry = CustomEntry(metadata_frame, width=65, posx=70, posy=20,
-                                   placeholder="For MP3: Artist name | For MP4: Channel / Director / Actor"
-        )
-        artist_entry.make_entry()
-
-        ttk.Label(metadata_frame, text="Album :", background=self._theme.get_secondary_color()).place(
-            x=20, y=60
-        )
-        album_entry = CustomEntry(metadata_frame, width=65, posx=70, posy=60,
-                                   placeholder="For MP3 only — ignored for MP4 files"
-        )
-        album_entry.make_entry()
-
-        return metadata_frame, artist_entry, album_entry
-
     def _create_progress_section(self):
         progress_bar = ttk.Progressbar(self, orient="horizontal", length=500, mode="determinate")
         progress_bar.place(x=30, y=437)
@@ -303,12 +257,7 @@ class HomeView(BaseView):
         cancel_button = ttk.Button(self, text="Cancel", width=20, command=lambda: self._on_cancel_clicked())
         cancel_button.place(x=366, y=525)
 
-        metadata_button = ttk.Button(self, text="Edit Metadata ➜", width=20, 
-                                     command=lambda: self._on_metadata_clicked()
-                                    )
-        metadata_button.place(x=213, y=560)
-
-        return download_button, metadata_button, cancel_button, reset_button
+        return download_button, cancel_button, reset_button
 
     def _get_form_data(self):
         base_folder = self._base_folder_entry.get_entry_text() if self._base_folder_entry else ""
@@ -319,7 +268,5 @@ class HomeView(BaseView):
             "url": self._url_entry.get_entry_text() if self._url_entry else "",
             "path": path if path else "",
             "mode": "mp3" if self._mode_var.get() == 1 else "mp4",
-            "quality": self._quality_selector.get_value(),
-            "artist": self._artist_entry.get_entry_text() if self._artist_entry else "",
-            "album": self._album_entry.get_entry_text() if self._album_entry else "",
+            "quality": self._quality_selector.get_value()
         }

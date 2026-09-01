@@ -16,12 +16,10 @@ from tkinter import messagebox
 
 from view.theme import AppTheme
 from view.home_view import HomeView
-from view.metadata_view import MetadataView
 
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
-from controller.metadata_controller import MetadataController
-from controller.update_controller import UpdateController
+from service.update_service import UpdateService
 
 from service.encoder_test_service import EncoderTestService
 
@@ -33,11 +31,9 @@ class App:
         self.theme = AppTheme()
 
         self._home_view: HomeView = None
-        self._metadata_view: MetadataView = None
         self._download_controller: DownloadController = None
-        self._metadata_controller: MetadataController = None
         self._folder_controller: FolderController = None
-        self._update_controller: UpdateController = None
+        self._update_controller: UpdateService = None
 
         self._encoder_var = tk.StringVar(value="CPU")
         self._available_encoders: list[dict] = []
@@ -137,40 +133,25 @@ class App:
 
     def _initialize_views(self):
         self._home_view = HomeView(self.root)
-        self._metadata_view = MetadataView(self.root)
 
-        for view in (self._home_view, self._metadata_view,):
-            view.place(x=0, y=0, width=560, height=600)
-            view.pack_propagate(False)
+        self._home_view.place(x=0, y=0, width=560, height=600)
+        self._home_view.pack_propagate(False)
 
     def _initialize_controllers(self):
         self._download_controller = DownloadController()
         self._folder_controller = FolderController(self._home_view.set_base_folder_path)
-        self._metadata_controller = MetadataController()
-        self._update_controller = UpdateController()
+        self._update_controller = UpdateService()
 
     def _wire_controllers_to_views(self):
         self._home_view.set_controllers(
             download_controller=self._download_controller,
             folder_controller=self._folder_controller,
-            metadata_callback=self._show_metadata
-        )
-
-        self._metadata_view.set_controllers(
-            metadata_controller=self._metadata_controller,
-            folder_controller=self._folder_controller,
-            home_callback=self._show_home
         )
 
         self._home_view.set_cancel_callback(self._download_controller.cancel_download)
 
     def _show_home(self):
         self._home_view.tkraise()
-
-    def _show_metadata(self, data: dict):
-        folder_path = data.get("path", "")
-        self._metadata_view.reset(data, folder_path)
-        self._metadata_view.tkraise()
 
     def _show_about(self):
         messagebox.showinfo(
@@ -184,13 +165,11 @@ class App:
 
     def _check_for_updates(self):        
         self._home_view.update_status("Checking and Updating")
-        self._metadata_view.update_status("Checking and Updating")
 
         self._update_controller.update_program(update_status = self._change_status_for_updates)
 
     def _change_status_for_updates(self, message):
         self._home_view.update_status(message)
-        self._metadata_view.update_status(message)
 
     def _on_encoder_selected(self, encoder_type: str = "CPU"):
         self._home_view.set_video_encoder(encoder_type)
