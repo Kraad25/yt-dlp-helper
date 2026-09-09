@@ -7,20 +7,27 @@ class FolderController:
         self._folder_model = FolderModel()
         self._AUDIO_EXT = (".mp3", ".aac", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma")
         self._VIDEO_EXT = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv")
-        
-        self._set_base_folder = set_base_folder
+
+        self._base_folder_listeners: list[Callable] = []
         self._new_path = self._folder_model.get_base_directory()
-        
-        if self._set_base_folder:
+
+        if set_base_folder:
+            self.add_base_folder_listener(set_base_folder)
             self._initialize_folder()
-        
+
     # Public Methods
+    def add_base_folder_listener(self, callback: Callable):
+        self._base_folder_listeners.append(callback)
+
+        if self._new_path:
+            callback(self._new_path)
+
     def browse_folder(self):
         folder = self._folder_model.browse_folder()
         if folder and os.path.exists(folder):
             self._new_path = folder
-            self._set_base_folder(self._new_path)
-    
+            self._notify_listeners(self._new_path)
+
     def build_target_path(self, base_dir: str, subfolder: str) -> str:
         base_dir = (base_dir or "").strip()
         subfolder = (subfolder or "").strip()
@@ -33,26 +40,29 @@ class FolderController:
             self._new_path = os.path.join(base_dir, subfolder)
             self._new_path = self._new_path.replace("\\", "/")
             return self._new_path
-    
+
     def get_files(self, folder_path, mode):
         if mode == "mp3":
             extensions = self._AUDIO_EXT
         elif mode == "mp4":
             extensions = self._VIDEO_EXT
-        
+
         return [
             f for f in os.listdir(folder_path)
             if os.path.isfile(os.path.join(folder_path, f)) and f.lower().endswith(extensions)
         ]
-    
+
     # Private Methods
     def _initialize_folder(self):
-        if self._set_base_folder:
-            folder_path = self._folder_model.get_base_directory()
-            
-            if folder_path and os.path.exists(folder_path):
-                self._set_base_folder(folder_path)
-            else:
-                default_path = os.path.expanduser("~/Documents")
-                default_path = default_path.replace("\\", "/")
-                self._set_base_folder(default_path)
+        folder_path = self._folder_model.get_base_directory()
+
+        if folder_path and os.path.exists(folder_path):
+            self._notify_listeners(folder_path)
+        else:
+            default_path = os.path.expanduser("~/Documents")
+            default_path = default_path.replace("\\", "/")
+            self._notify_listeners(default_path)
+
+    def _notify_listeners(self, path: str):
+        for callback in self._base_folder_listeners:
+            callback(path)

@@ -64,3 +64,33 @@ class YoutubeModel:
             ydl.download([url])
             downloaded_file = ydl.prepare_filename(ydl.extract_info(url, download=False))
         return downloaded_file
+
+    def search_videos(self, query: str, limit: int = 8) -> list[dict]:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+            'skip_download': True,
+        }
+ 
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+ 
+        results = []
+        for entry in (info.get('entries') or []):
+            video_id = entry.get('id')
+            if not video_id:
+                continue
+ 
+            thumbnails = entry.get('thumbnails') or []
+            thumb_url = thumbnails[-1]['url'] if thumbnails else None
+ 
+            results.append({
+                'id': video_id,
+                'title': entry.get('title', 'Untitled'),
+                'channel': entry.get('channel') or entry.get('uploader') or 'Unknown channel',
+                'duration': entry.get('duration'),
+                'thumbnail_url': thumb_url,
+                'url': f"https://www.youtube.com/watch?v={video_id}",
+            })
+        return results

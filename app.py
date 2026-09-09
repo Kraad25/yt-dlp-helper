@@ -16,14 +16,16 @@ from tkinter import messagebox
 
 from view.theme import AppTheme
 from view.home_view import HomeView
+from view.explorer_view import ExplorerView
 
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
+from controller.explore_controller import ExploreController
 from service.update_service import UpdateService
 
 from service.encoder_test_service import EncoderTestService
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 class App:
     def __init__(self):
@@ -31,9 +33,12 @@ class App:
         self.theme = AppTheme()
 
         self._home_view: HomeView = None
+        self._explorer_view: ExplorerView = None
         self._download_controller: DownloadController = None
+        self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
-        self._update_controller: UpdateService = None
+
+        self._update_service: UpdateService = None
 
         self._encoder_var = tk.StringVar(value="CPU")
         self._available_encoders: list[dict] = []
@@ -79,6 +84,9 @@ class App:
 
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Home", command=self._show_home)
+        file_menu.add_command(label="Explore Youtube", command=self._show_explore)
+        file_menu.add_separator()
         file_menu.add_command(label="Update", command=self._check_for_updates)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
@@ -133,25 +141,36 @@ class App:
 
     def _initialize_views(self):
         self._home_view = HomeView(self.root)
+        self._explorer_view = ExplorerView(self.root)
 
-        self._home_view.place(x=0, y=0, width=560, height=600)
-        self._home_view.pack_propagate(False)
+        for view in (self._explorer_view, self._home_view):
+            view.place(x=0, y=0, width=560, height=600)
+            view.pack_propagate(False)
 
     def _initialize_controllers(self):
         self._download_controller = DownloadController()
         self._folder_controller = FolderController(self._home_view.set_base_folder_path)
-        self._update_controller = UpdateService()
+        self._explore_controller = ExploreController(self._download_controller)
+        self._update_service = UpdateService()
 
     def _wire_controllers_to_views(self):
         self._home_view.set_controllers(
             download_controller=self._download_controller,
             folder_controller=self._folder_controller,
         )
+        self._explorer_view.set_controllers(
+            explore_controller=self._explore_controller,
+            folder_controller=self._folder_controller,
+        )
 
+        self._folder_controller.add_base_folder_listener(self._explorer_view.set_base_folder_path)
         self._home_view.set_cancel_callback(self._download_controller.cancel_download)
 
     def _show_home(self):
         self._home_view.tkraise()
+
+    def _show_explore(self):
+        self._explorer_view.tkraise()
 
     def _show_about(self):
         messagebox.showinfo(
@@ -166,7 +185,7 @@ class App:
     def _check_for_updates(self):        
         self._home_view.update_status("Checking and Updating")
 
-        self._update_controller.update_program(update_status = self._change_status_for_updates)
+        self._update_service.update_program(update_status = self._change_status_for_updates)
 
     def _change_status_for_updates(self, message):
         self._home_view.update_status(message)
