@@ -1,10 +1,9 @@
-import tkinter as tk
-from tkinter import ttk
+import customtkinter
 from abc import ABC, abstractmethod
 
-class BaseView(ttk.Frame, ABC):
-    def __init__(self, parent: tk.Widget):
-        super().__init__(parent)
+class BaseView(customtkinter.CTkFrame, ABC):
+    def __init__(self, parent, width: int = 900, height: int = 600):
+        super().__init__(parent, width=width, height=height)
 
         self._setup_style()
         self._create_widgets()

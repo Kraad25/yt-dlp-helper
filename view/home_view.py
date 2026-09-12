@@ -1,11 +1,9 @@
-import tkinter as tk
-from tkinter import ttk
+import customtkinter
 from typing import Callable
 
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox
 from view.custom_entry import CustomEntry
-from view.theme import AppTheme
 
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
@@ -15,15 +13,26 @@ class Mode:
     MP4 = 2
 
 class HomeView(BaseView):
-    def __init__(self, parent: tk.Widget):
-        self._theme = AppTheme()
-        self._mode_var = tk.IntVar(value=Mode.MP3)  # Default to Mp3
+
+    ROW_HEADER = 0
+    ROW_URL_LABEL = 1
+    ROW_URL_ENTRY = 2
+    ROW_DEST_LABEL = 3
+    ROW_DEST_ENTRY = 4
+    ROW_MODE_QUALITY = 5
+    ROW_SPACER = 6
+    ROW_PROGRESS = 7
+    ROW_STATUS = 8
+    ROW_ACTIONS = 9
+
+    def __init__(self, parent):
+        self._mode_var = customtkinter.IntVar(value=Mode.MP3)  # Default to Mp3
+        self._seg_button_var = customtkinter.StringVar(value="🎵 Mp3")
 
         self._url_entry = None
-        self._base_folder_entry = None
-        self._subfolder_entry = None
+        self._destination_entry = None
         self._progress_bar = None
-        self._status_entry = None
+        self._status_label = None
         self._quality_selector = None
         self._download_button = None
 
@@ -44,28 +53,32 @@ class HomeView(BaseView):
         self._on_cancel = callback
 
     def set_base_folder_path(self, path: str):
-        if self._base_folder_entry:
-            self._base_folder_entry.set_entry_text(path)
+        if self._destination_entry:
+            self._destination_entry.delete(0, "end")
+            self._destination_entry.insert(0, path)
 
     def set_download_enabled(self, enabled: bool):
-        state = tk.NORMAL if enabled else tk.DISABLED
-        self._download_button.config(state=state)
+        state = "normal" if enabled else "disabled"
+        self._download_button.configure(state=state)
 
     def set_cancel_enabled(self, enabled: bool):
-        state = tk.NORMAL if enabled else tk.DISABLED
-        if self._cancel_button:
-            self._cancel_button.config(state=state)
+        if not self._cancel_button:
+            return
+        if enabled:
+            self._enter_download_state()
+        else:
+            self._exit_download_state()
 
     def set_video_encoder(self, encoder: str):
         self._video_encoder = encoder
 
     def update_progress(self, value: int):
         if self._progress_bar:
-            self._progress_bar['value'] = value
+            self._progress_bar.set(value / 100)
 
     def update_status(self, status: str):
-        if self._status_entry:
-            self._status_entry.set_readonly_entry_text(status)
+        if self._status_label:
+            self._status_label.configure(text=status)
 
     # Event Handlers
     def _on_download_clicked(self):
@@ -85,6 +98,13 @@ class HomeView(BaseView):
     def _on_browse_clicked(self):
         self._folder_controller.browse_folder()
 
+    def _on_segmented_change(self, value):
+        if "Mp3" in value:
+            self._mode_var.set(Mode.MP3)
+        else:
+            self._mode_var.set(Mode.MP4)
+        self._on_mode_change()
+
     def _on_mode_change(self):
         mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
         self._quality_selector.switch_mode(mode)
@@ -93,180 +113,151 @@ class HomeView(BaseView):
         if self._on_cancel:
             self._on_cancel()
 
-    def _on_reset_clicked(self):
-        if self._url_entry:
-            self._url_entry.set_entry_text("")
+    def _enter_download_state(self):
+        self._download_button.grid_configure(column=0, columnspan=1)
+        self._cancel_button.configure(state="normal")
+        self._cancel_button.grid()  # re-show
+        self._progress_bar.set(0)
+        self._progress_bar.grid()  # re-show
 
-        self._mode_var.set(Mode.MP3)
-        self.update_progress(0)
-        self.update_status("Ready")
+    def _exit_download_state(self):
+        self._download_button.grid_configure(column=0, columnspan=2)
+        self._cancel_button.grid_remove()
+        self._progress_bar.grid_remove()
 
     # Private Methods
     def _setup_style(self):
-        style = ttk.Style()
-        style.configure("Beige.TFrame", background=self._theme.get_background_color())
-        style.configure(
-            "Grey.TLabelframe",
-            background=self._theme.get_secondary_color(),
-            borderwidth=2,
-            relief="solid",
-        )
-        style.configure(
-            "Grey.TLabelframe.Label",
-            background=self._theme.get_secondary_color(),
-            font=("Segoe UI", 10),
-        )
+        pass  # CTk widgets are themed via themes/warm_refined.json
 
     def _create_widgets(self):
-        self.configure(style="Beige.TFrame")
-
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(self.ROW_SPACER, weight=1)
+        self.grid_rowconfigure(self.ROW_PROGRESS, minsize=18)
+        
         self._title = self._create_header()
         self._url_entry = self._create_url_input()
-        self._base_folder_entry, self._browse_button = self._create_base_folder_input()
-        self._subfolder_entry = self._create_subfolder_input()
-        self._mp3_radio, self._mp4_radio = self._create_mode_section()
-        self._quality_selector = self._create_quality_section()
-        self._progress_bar, self._status_entry = self._create_progress_section()
-        self._download_button, self._cancel_button, self._reset_button = self._create_action_buttons()
+        self._destination_entry, self._browse_button = self._create_destination_input()
+        self._mode_segmented, self._quality_selector = self._create_mode_and_quality()
+        self._progress_bar, self._status_label = self._create_progress_section()
+        self._download_button, self._cancel_button = self._create_action_buttons()
 
         self.set_cancel_enabled(False)
         self.update_status("Ready")
 
     def _create_header(self):
-        label = ttk.Label(
+        title = customtkinter.CTkLabel(
             self,
             text="Media Downloader",
-            font=("Helvetica", 16),
-            background=self._theme.get_background_color()
-        ).place(x=195, y=20)
-        return label
+            font=customtkinter.CTkFont(size=18, weight="bold"),
+        ).grid(row=self.ROW_HEADER, column=0, columnspan=2, pady=(20, 15))
+
+        return title
 
     def _create_url_input(self):
-        label = ttk.Label(
-            self,
-            text="URL:",
-            font=("Helvetica", 13),
-            background=self._theme.get_background_color()
-        ).place(x=30, y=80)
+        url_label = customtkinter.CTkLabel(self, text="URL", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
+        url_label.grid(row=self.ROW_URL_LABEL, column=0, columnspan=2, sticky="w", padx=30)
 
-        entry = CustomEntry(self, width=70, posx=85, posy=80)
-        entry.make_entry()
+        url_entry = customtkinter.CTkEntry(self, placeholder_text="Paste a supported URL")
+        url_entry.grid(row=self.ROW_URL_ENTRY, column=0, columnspan=2, sticky="ew", padx=30, pady=(2, 15))
+        return url_entry
 
-        return entry
+    def _create_destination_input(self):
+        destination_label = customtkinter.CTkLabel(self, text="Destination", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
+        destination_label.grid(row=self.ROW_DEST_LABEL, column=0, columnspan=2, sticky="w", padx=30)
+        
+        destination_entry = customtkinter.CTkEntry(self, placeholder_text="Select download destination")
+        destination_entry.grid(row=self.ROW_DEST_ENTRY, column=0, sticky="ew", padx=(30, 8), pady=(2, 15))
 
-    def _create_base_folder_input(self):
-        label = ttk.Label(
-            self,
-            text="Base:",
-            font=("Helvetica", 13),
-            background=self._theme.get_background_color()
-        ).place(x=30, y=120)
-
-        entry = CustomEntry(self, width=70, posx=85, posy=120,
-                            placeholder="Select base folder for downloads"
-        )
-        entry.make_entry()
-
-        browse_button = tk.Button(
+        browse_button = customtkinter.CTkButton(
             self,
             text="📁",
-            font=("Arial", 12),
-            padx=1,
-            pady=1,
-            bd=0,
+            width=32,
+            height=28, 
+            fg_color="transparent",
+            border_width=1,
+            text_color=("gray10", "gray90"),
             command=lambda: self._on_browse_clicked()
         )
-        browse_button.place(x=520, y=116)
 
-        return entry, browse_button
-    
-    def _create_subfolder_input(self):
-        label = ttk.Label(
-            self,
-            text="Folder:",
-            font=("Helvetica", 13),
-            background=self._theme.get_background_color()
-        ).place(x=30, y=160)
+        browse_button.grid(row=self.ROW_DEST_ENTRY, column=1, sticky="e", padx=(0, 30), pady=(2, 15))
 
-        entry = CustomEntry(self, width=70, posx=85, posy=160,
-                            placeholder="Optional subfolder name"
+        return destination_entry, browse_button
+
+    def _create_mode_and_quality(self):
+        group = customtkinter.CTkFrame(self, fg_color="transparent")
+        group.grid(row=self.ROW_MODE_QUALITY, column=0, columnspan=2, sticky="w", padx=30, pady=(0, 15))
+
+        segmented_button = customtkinter.CTkSegmentedButton(
+            group,
+            values=["🎵 Mp3", "🎬 Mp4"],
+            variable=self._seg_button_var,
+            command=self._on_segmented_change,
+            width=180,
+            height=36,
+            font=customtkinter.CTkFont(size=14, weight="bold")
         )
-        entry.make_entry()
-        return entry
-    
-    def _create_mode_section(self):
-        mode_button_mp3 = tk.Radiobutton(
-            self,
-            text="Mp3 🎵",
-            variable=self._mode_var,
-            value=1,
-            bg=self._theme.get_background_color(),
-            activebackground=self._theme.get_background_color(),
-            command=lambda: self._on_mode_change()
-        )
-        mode_button_mp4 = tk.Radiobutton(
-            self,
-            text="Mp4 🎬",
-            variable=self._mode_var,
-            value=2,
-            bg=self._theme.get_background_color(),
-            activebackground=self._theme.get_background_color(),
-            command=lambda: self._on_mode_change()
-        )
-        mode_button_mp3.place(x=30, y=197)
-        mode_button_mp4.place(x=100, y=197)
+        segmented_button.grid(row=0, column=0, rowspan=2, sticky="w")
 
-        return mode_button_mp3, mode_button_mp4
+        quality_label = customtkinter.CTkLabel(group, text="Quality", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
+        quality_label.grid(row=0, column=1, sticky="e", padx=(30, 0))
 
-    def _create_quality_section(self):
-        label = ttk.Label(
-            self,
-            text="Quality:",
-            font=("Helvetica", 13),
-            background=self._theme.get_background_color()
-        ).place(x=30, y=237)
+        quality_selector = CustomComboBox(group, self._mode_var, width=130)
+        quality_selector.widget.grid(row=0, column=2, sticky="w", padx=(15, 0), pady=(2, 0))
 
-        quality_selector = CustomComboBox(self, self._mode_var, 100, 237)
-        quality_selector.make_combobox()
-
-        return quality_selector
+        return segmented_button, quality_selector
 
     def _create_progress_section(self):
-        progress_bar = ttk.Progressbar(self, orient="horizontal", length=500, mode="determinate")
-        progress_bar.place(x=30, y=437)
+        progress_bar = customtkinter.CTkProgressBar(self, height=10)
+        progress_bar.set(0)
+        progress_bar.grid(row=self.ROW_PROGRESS, column=0, columnspan=2, sticky="ew", padx=30, pady=(0, 4))
 
-        ttk.Label(
-            self,
-            text="Status: ",
-            background=self._theme.get_background_color(),
-            font=("Segoe UI", 12, "italic")
-        ).place(x=108, y=477)
+        # hidden until a download starts
+        progress_bar.grid_remove()
 
-        status_entry = CustomEntry(self, width=40, posx=158, posy=480)
-        status_entry.make_entry()
+        status_label = customtkinter.CTkLabel(self, text="Ready", font=customtkinter.CTkFont(size=12, slant="italic"), text_color="gray50", anchor="w")
+        status_label.grid(row=self.ROW_STATUS, column=0, columnspan=2, sticky="w", padx=30, pady=(0, 15))
 
-        return progress_bar, status_entry
+        return progress_bar, status_label
 
     def _create_action_buttons(self):
-        download_button = ttk.Button(self, text="Download", width=20, command=lambda: self._on_download_clicked())
-        download_button.place(x=60, y=525)
+        action_row = customtkinter.CTkFrame(self, fg_color="transparent")
+        action_row.grid(row=self.ROW_ACTIONS, column=0, columnspan=2, sticky="ew", padx=30, pady=(0, 25))
+        action_row.grid_columnconfigure(0, weight=1)
+        action_row.grid_columnconfigure(1, weight=0, minsize=0)
 
-        reset_button = ttk.Button(self, text="Reset Entries", width=20, command=lambda: self._on_reset_clicked())
-        reset_button.place(x=213, y=525)
-   
-        cancel_button = ttk.Button(self, text="Cancel", width=20, command=lambda: self._on_cancel_clicked())
-        cancel_button.place(x=366, y=525)
+        download_button = customtkinter.CTkButton(
+            action_row,
+            text="⭳ Download",
+            height=45,
+            font=customtkinter.CTkFont(size=15, weight="bold"),
+            command=self._on_download_clicked,
+        )
+        download_button.grid(row=0, column=0, sticky="ew")
 
-        return download_button, cancel_button, reset_button
+        cancel_button = customtkinter.CTkButton(
+            action_row,
+            text="Cancel",
+            width=110,
+            height=45,
+            fg_color="transparent",
+            border_width=1,
+            text_color=("gray10", "gray90"),
+            command=self._on_cancel_clicked,
+        )
+        cancel_button.grid(row=0, column=1, sticky="e", padx=(10, 0))
+
+        # hidden until a download starts
+        cancel_button.grid_remove()
+
+        return download_button, cancel_button
 
     def _get_form_data(self):
-        base_folder = self._base_folder_entry.get_entry_text() if self._base_folder_entry else ""
-        subfolder = self._subfolder_entry.get_entry_text() if self._subfolder_entry else ""
-        path = self._folder_controller.build_target_path(base_folder, subfolder)
+        destination = self._destination_entry.get().strip() if self._destination_entry else ""
+        path = self._folder_controller.build_target_path(destination, "")
 
         return {
-            "url": self._url_entry.get_entry_text() if self._url_entry else "",
+            "url": self._url_entry.get().strip() if self._url_entry else "",
             "path": path if path else "",
-            "mode": "mp3" if self._mode_var.get() == 1 else "mp4",
-            "quality": self._quality_selector.get_value()
+            "mode": "mp3" if self._mode_var.get() == Mode.MP3 else "mp4",
+            "quality": self._quality_selector.get_value(),
         }
