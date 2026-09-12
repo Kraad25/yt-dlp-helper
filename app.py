@@ -17,7 +17,7 @@ import customtkinter as ctk
 
 from view.theme import AppTheme
 from view.home_view import HomeView
-# from view.explorer_view import ExplorerView
+from view.explorer_view import ExplorerView
 
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
@@ -39,10 +39,11 @@ class App:
         self.root = ctk.CTk()
 
         self._home_view: HomeView = None
-        # self._explorer_view: ExplorerView = None
+        self._explorer_view: ExplorerView = None
         self._download_controller: DownloadController = None
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
+        self._explore_folder_controller: FolderController = None
 
         self._update_service: UpdateService = None
 
@@ -89,7 +90,7 @@ class App:
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Home", command=self._show_home)
-        # file_menu.add_command(label="Explore Youtube", command=self._show_explore)
+        file_menu.add_command(label="Explore Youtube", command=self._show_explore)
         file_menu.add_separator()
         file_menu.add_command(label="Update", command=self._check_for_updates)
         file_menu.add_separator()
@@ -147,9 +148,13 @@ class App:
         self._home_view = HomeView(self.root)
         self._home_view.grid(row=0, column=0, sticky="nsew")
 
+        self._explorer_view = ExplorerView(self.root)
+        self._explorer_view.grid(row=0, column=0, sticky="nsew")
+
     def _initialize_controllers(self):
         self._download_controller = DownloadController()
         self._folder_controller = FolderController(self._home_view.set_base_folder_path)
+        self._explore_folder_controller = FolderController(self._explorer_view.set_base_folder_path)
         self._explore_controller = ExploreController(self._download_controller)
         self._update_service = UpdateService()
 
@@ -158,12 +163,11 @@ class App:
             download_controller=self._download_controller,
             folder_controller=self._folder_controller,
         )
-        # self._explorer_view.set_controllers(
-        #     explore_controller=self._explore_controller,
-        #     folder_controller=self._folder_controller,
-        # )
-
-        # self._folder_controller.add_base_folder_listener(self._explorer_view.set_base_folder_path)
+        self._explorer_view.set_controllers(
+            explore_controller=self._explore_controller,
+            folder_controller=self._explore_folder_controller,
+        )
+                
         self._home_view.set_cancel_callback(self._download_controller.cancel_download)
 
     def _show_home(self):

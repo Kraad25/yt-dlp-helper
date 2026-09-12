@@ -3,7 +3,6 @@ from typing import Callable
 
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox
-from view.custom_entry import CustomEntry
 
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
