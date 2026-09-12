@@ -1,31 +1,36 @@
-import tkinter as tk
-from tkinter import ttk
+import customtkinter
 from typing import Callable
 
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox
-from view.custom_entry import CustomEntry
-from view.theme import AppTheme
 
 from controller.folder_controller import FolderController
 from controller.explore_controller import ExploreController
-
-from PIL import ImageTk
 
 class Mode:
     MP3 = 1
     MP4 = 2
 
 class ExplorerView(BaseView):
-    def __init__(self, parent: tk.Widget):
-        self._theme = AppTheme()
-        self._mode_var = tk.IntVar(value=Mode.MP3)  # Default to Mp3
-        self._quality_selector = None
 
-        self._folder_entry = None
-        self._url_entry = None
+    ROW_HEADER = 0
+    ROW_DEST_LABEL = 1
+    ROW_DEST_ROW = 2
+    ROW_MODE_QUALITY = 3
+    ROW_RESULTS = 4
+    ROW_STATUS = 5
+
+    def __init__(self, parent):
+        self._mode_var = customtkinter.IntVar(value=Mode.MP3)
+        self._seg_button_var = customtkinter.StringVar(value="🎵 Mp3")
+
+        self._destination_entry = None
+        self._browse_button = None
+        self._quality_selector = None
+        self._search_entry = None
         self._results_frame = None
         self._status_label = None
+        self._context_menu = None
 
         self._thumb_refs = []
 
@@ -40,244 +45,228 @@ class ExplorerView(BaseView):
         self._folder_controller = folder_controller
 
     def set_base_folder_path(self, path: str):
-        if self._folder_entry:
-            self._folder_entry.set_entry_text(path)
+        if self._destination_entry:
+            self._destination_entry.delete(0, "end")
+            self._destination_entry.insert(0, path)
 
     # Private Methods
     def _setup_style(self):
-        style = ttk.Style()
-        style.configure("Beige.TFrame", background=self._theme.get_background_color())
-        style.configure(
-            "Grey.TLabelframe",
-            background=self._theme.get_secondary_color(),
-            borderwidth=2,
-            relief="solid",
-        )
-        style.configure(
-            "Grey.TLabelframe.Label",
-            background=self._theme.get_secondary_color(),
-            font=("Segoe UI", 10),
-        )
+        pass # CTk widgets are themed via themes/warm_refined.json
 
     def _create_widgets(self):
-        self.configure(style="Beige.TFrame")
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(self.ROW_RESULTS, weight=1)
 
         self._title = self._create_header()
-        self._folder_entry, self._browse_button = self._create_base_folder_input()
-        self._mp3_radio, self._mp4_radio = self._create_mode_section()
-        self._quality_selector = self._create_quality_section()
-        self._youtube_section, self._url_entry = self._create_youtube_section()
+        self._destination_entry, self._browse_button = self._create_destination_input()
+        self._mode_segmented, self._quality_selector = self._create_mode_and_quality()        
+        self._results_frame, self._search_entry = self._create_results_area()
         self._status_label = self._create_status_label()
+        self._context_menu = self._create_context_menu()
 
     def _create_header(self):
-        label = ttk.Label(
+        title_label = customtkinter.CTkLabel(
             self,
-            text="Explore Youtube and Download",
-            font=("Helvetica", 16),
-            background=self._theme.get_background_color()
-        ).place(x=135, y=20)
-        return label
-
-    def _create_base_folder_input(self):
-        label = ttk.Label(
-            self,
-            text="Dest:",
-            font=("Helvetica", 13),
-            background=self._theme.get_background_color()
-        ).place(x=30, y=80)
-
-        entry = CustomEntry(self, width=70, posx=85, posy=80,
-                            placeholder="Select Destination folder for downloads"
+            text="Explore YouTube",
+            font=customtkinter.CTkFont(size=18, weight="bold"),
         )
-        entry.make_entry()
+        title_label.grid(row=self.ROW_HEADER, column=0, pady=(20, 15))
 
-        browse_button = tk.Button(
-            self,
+        return title_label
+
+    def _create_destination_input(self):
+        destination_label = customtkinter.CTkLabel(self, text="Destination", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
+        destination_label.grid(row=self.ROW_DEST_LABEL, column=0, sticky="w", padx=30)
+
+        dest_row = customtkinter.CTkFrame(self, fg_color="transparent")
+        dest_row.grid(row=self.ROW_DEST_ROW, column=0, sticky="ew", padx=30, pady=(2, 15))
+        dest_row.grid_columnconfigure(0, weight=1)
+        dest_row.grid_columnconfigure(1, weight=0)
+
+        destination_entry = customtkinter.CTkEntry(dest_row, placeholder_text="Select download destination")
+        destination_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        browse_button = customtkinter.CTkButton(
+            dest_row,
             text="📁",
-            font=("Arial", 12),
-            padx=1,
-            pady=1,
-            bd=0,
-            command=lambda: self._on_browse_clicked()
+            width=32,
+            height=28,
+            fg_color="transparent",
+            border_width=1,
+            text_color=("gray10", "gray90"),
+            command=self._on_browse_clicked,
         )
-        browse_button.place(x=520, y=76)
+        browse_button.grid(row=0, column=1, sticky="e")
 
-        return entry, browse_button
+        return destination_entry, browse_button
 
-    def _create_mode_section(self):
-        mode_button_mp3 = tk.Radiobutton(
-            self,
-            text="Mp3 🎵",
-            variable=self._mode_var,
-            value=1,
-            bg=self._theme.get_background_color(),
-            activebackground=self._theme.get_background_color(),
-            command=lambda: self._on_mode_change()
+    def _create_mode_and_quality(self):
+        group = customtkinter.CTkFrame(self, fg_color="transparent")
+        group.grid(row=self.ROW_MODE_QUALITY, column=0, sticky="w", padx=30, pady=(0, 15))
+
+        segmented_button = customtkinter.CTkSegmentedButton(
+            group,
+            values=["🎵 Mp3", "🎬 Mp4"],
+            variable=self._seg_button_var,
+            command=self._on_segmented_change,
+            width=180,
+            height=36,
+            font=customtkinter.CTkFont(size=14, weight="bold"),
         )
-        mode_button_mp4 = tk.Radiobutton(
-            self,
-            text="Mp4 🎬",
-            variable=self._mode_var,
-            value=2,
-            bg=self._theme.get_background_color(),
-            activebackground=self._theme.get_background_color(),
-            command=lambda: self._on_mode_change()
+        segmented_button.grid(row=0, column=0, sticky="w")
+
+        quality_label = customtkinter.CTkLabel(group, text="Quality", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
+        quality_label.grid(row=0, column=1, sticky="e", padx=(30, 0))
+
+        quality_selector = CustomComboBox(group, self._mode_var, width=130)
+        quality_selector.widget.grid(row=0, column=2, sticky="w", padx=(15, 0))
+
+        return segmented_button, quality_selector
+
+    def _create_results_area(self):
+        panel = customtkinter.CTkFrame(self, fg_color=("gray88", "gray19"), corner_radius=10)
+        panel.grid(row=self.ROW_RESULTS, column=0, sticky="nsew", padx=30, pady=(0, 10))
+        panel.grid_columnconfigure(0, weight=1)
+        panel.grid_rowconfigure(1, weight=1)
+
+        search_row = customtkinter.CTkFrame(panel, fg_color="transparent")
+        search_row.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        search_row.grid_columnconfigure(0, weight=1)
+        search_row.grid_columnconfigure(1, weight=0)
+
+        search_entry = customtkinter.CTkEntry(search_row, placeholder_text="Search YouTube", height=32)
+        search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        search_entry.bind("<Return>", lambda e: self._on_search_clicked())
+
+        search_button = customtkinter.CTkButton(
+            search_row, text="🔍", width=36, height=32, command=self._on_search_clicked
         )
-        mode_button_mp3.place(x=70, y=127)
-        mode_button_mp4.place(x=140, y=127)
+        search_button.grid(row=0, column=1, sticky="e")
 
-        return mode_button_mp3, mode_button_mp4
+        results_frame = customtkinter.CTkScrollableFrame(panel, fg_color="transparent")
+        results_frame.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0, 6))
+        results_frame.grid_columnconfigure(0, weight=1)
 
-    def _create_quality_section(self):
-        label = ttk.Label(
-            self,
-            text="Quality:",
-            font=("Helvetica", 13),
-            background=self._theme.get_background_color()
-        ).place(x=250, y=127)
-
-        quality_selector = CustomComboBox(self, self._mode_var, 315, 127)
-        quality_selector.make_combobox()
-
-        return quality_selector
-
-    def _create_youtube_section(self):
-        results_container = tk.LabelFrame(
-            self,
-            width=500,
-            height=400,
-            bg=self._theme.get_secondary_color(),
-            fg="black",
-            font=("Arial", 10, "italic bold"),
-            bd=5,
-            relief="ridge"
-        )
-        results_container.place(x=30, y=170)
-        results_container.pack_propagate(False)
-
-        url_entry = CustomEntry(results_container, width=65, posx=50, posy=10, placeholder="Search in Youtube")
-        search_entry_widget = url_entry.make_entry()
-        search_entry_widget.bind("<Return>", lambda e: self._on_search_clicked())
-
-        search_button = tk.Button(
-            self,
-            text="🔍",
-            font=("Arial", 11),
-            padx=0,
-            pady=0,
-            bd=0,
-            command=lambda: self._on_search_clicked()
-        )
-        search_button.place(x=490, y=183)
-
-        self._create_results_area(results_container)
-
-        return results_container, url_entry
-
-    def _create_results_area(self, parent_frame):
-        canvas = tk.Canvas(parent_frame, background=self._theme.get_secondary_color(),
-                            highlightthickness=0)
-        scrollbar = ttk.Scrollbar(parent_frame, orient="vertical", command=canvas.yview)
-        results_frame = tk.Frame(canvas, background=self._theme.get_secondary_color())
-
-        results_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=results_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.place(x=10, y=50, width=460, height=335)
-        scrollbar.place(x=470, y=50, height=335)
-
-        self._results_frame = results_frame
+        return results_frame, search_entry
 
     def _create_status_label(self):
-        label = ttk.Label(
+        label = customtkinter.CTkLabel(
             self,
             text="Type something and hit search",
-            background=self._theme.get_background_color(),
-            font=("Segoe UI", 9, "italic"),
+            font=customtkinter.CTkFont(size=12, slant="italic"),
+            text_color="gray50",
+            anchor="w",
         )
-        label.place(x=30, y=577)
+        label.grid(row=self.ROW_STATUS, column=0, sticky="w", padx=30, pady=(0, 15))
         return label
+
+    def _create_context_menu(self):
+        import tkinter as tk
+        menu = tk.Menu(self, tearoff=0)
+        return menu
 
     # Event Handlers
     def _on_browse_clicked(self):
         self._folder_controller.browse_folder()
+
+    def _on_segmented_change(self, value):
+        self._mode_var.set(Mode.MP3 if "Mp3" in value else Mode.MP4)
+        self._on_mode_change()
 
     def _on_mode_change(self):
         mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
         self._quality_selector.switch_mode(mode)
 
     def _on_search_clicked(self):
-        query = self._url_entry.get_entry_text()
+        query = self._search_entry.get().strip()
         if not query:
             return
 
         self._clear_results()
-        self._status_label.config(text=f"Searching for '{query}'...")
+        self._status_label.configure(text=f"Searching for '{query}'...")
         self._explore_controller.search(query, self._on_results_ready, self._on_search_error)
 
     def _on_results_ready(self, results: list):
         if not results:
-            self._status_label.config(text="No results found.")
+            self._status_label.configure(text="No results found.")
             return
-        self._status_label.config(text=f"{len(results)} results")
-        for entry in results:
-            self._render_result_row(entry)
+
+        self._status_label.configure(text=f"{len(results)} results")
+
+        for index, entry in enumerate(results):
+            self._render_result_row(entry, index)
 
     def _on_search_error(self, error_message: str):
-        self._status_label.config(text=f"Search failed: {error_message}")
+        self._status_label.configure(text=f"Search failed: {error_message}")
 
     def _clear_results(self):
         self._thumb_refs.clear()
         for widget in self._results_frame.winfo_children():
             widget.destroy()
 
-    def _render_result_row(self, entry: dict):
-        row = tk.Frame(self._results_frame, background=self._theme.get_secondary_color(), padx=4, pady=4)
-        row.pack(fill="x", pady=2)
+    def _render_result_row(self, entry: dict, index: int):
+        row = customtkinter.CTkFrame(self._results_frame, fg_color=("gray85", "gray20"))
+        row.grid(row=index, column=0, sticky="ew", pady=4, padx=2)
+        row.grid_columnconfigure(1, weight=1)
 
-        thumb_label = tk.Label(row, text="...", width=14, height=4,
-                                bg=self._theme.get_background_color())
-        thumb_label.pack(side="left", padx=(0, 8))
+        thumb_label = customtkinter.CTkLabel(row, text="...", width=112, height=63, fg_color=("gray75", "gray25"))
+        thumb_label.grid(row=0, column=0, padx=8, pady=8, sticky="w")
 
         thumbnail_url = entry.get("thumbnail_url")
         self._explore_controller.get_thumbnail(
             thumbnail_url, self, lambda image, lbl=thumb_label: self._apply_thumbnail(lbl, image)
         )
 
-        text_frame = tk.Frame(row, background=self._theme.get_secondary_color())
-        text_frame.pack(side="left", fill="both", expand=True)
+        text_frame = customtkinter.CTkFrame(row, fg_color="transparent")
+        text_frame.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=8)
+        text_frame.grid_columnconfigure(0, weight=1)
 
         title = entry.get("title", "Untitled")
         channel = entry.get("channel", "Unknown channel")
         duration = entry.get("duration")
         duration_str = f"{duration // 60}:{duration % 60:02d}" if duration else ""
 
-        tk.Label(text_frame, text=title, font=("Segoe UI", 9, "bold"), wraplength=280,
-                 background=self._theme.get_secondary_color(), justify="left").pack(anchor="w")
+        customtkinter.CTkLabel(
+            text_frame, text=title, font=customtkinter.CTkFont(size=12, weight="bold"),
+            anchor="w", justify="left", wraplength=280,
+        ).grid(row=0, column=0, sticky="w")
         
-        tk.Label(text_frame, text=f"{channel}  •  {duration_str}", font=("Segoe UI", 8),
-                 background=self._theme.get_secondary_color()).pack(anchor="w")
+        channel_label = customtkinter.CTkLabel(
+            text_frame, text=f"{channel}  •  {duration_str}",
+            font=customtkinter.CTkFont(size=11), text_color=("gray40", "gray60"), anchor="w", cursor="hand2",
+        )
+        channel_label.grid(row=1, column=0, sticky="w")
+        channel_label.bind("<Button-1>", lambda e, ch=channel: self._on_channel_clicked(ch))
 
         for widget in (row, thumb_label, text_frame):
-            widget.bind("<Button-1>", lambda e, data=entry: self._on_result_clicked(data))
+            widget.bind("<Button-3>", lambda e, data=entry: self._on_result_right_clicked(e, data))
 
-    def _apply_thumbnail(self, label: tk.Label, image):
+    def _apply_thumbnail(self, label, image):
         if image is None:
-            label.config(text="No\nImage")
+            label.configure(text="No\nImage")
             return
-        photo = ImageTk.PhotoImage(image)
-        self._thumb_refs.append(photo)
-        label.config(image=photo, text="", width=0, height=0)
+        
+        ctk_image = customtkinter.CTkImage(light_image=image, dark_image=image, size=(112, 63))
+        self._thumb_refs.append(ctk_image)
+        label.configure(image=ctk_image, text="")
+
+    def _on_result_right_clicked(self, event, entry: dict):
+        self._context_menu.delete(0, "end")
+        self._context_menu.add_command(
+            label=f"Download: {entry.get('title', 'this video')}",
+            command=lambda: self._on_result_clicked(entry),
+        )
+
+        self._context_menu.tk_popup(event.x_root, event.y_root)
+
+    def _on_channel_clicked(self, channel_name: str):        
+        self._status_label.configure(text=f"Channel browsing for '{channel_name}' is coming soon.")
 
     def _on_result_clicked(self, entry: dict):
-        base_path = self._folder_entry.get_entry_text()
+        base_path = self._destination_entry.get().strip()
+
         if not base_path:
-            self._status_label.config(text="Set a destination folder first.")
+            self._status_label.configure(text="Set a destination folder first.")
             return
 
         mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
@@ -285,11 +274,11 @@ class ExplorerView(BaseView):
         url = entry.get("url")
         title = entry.get("title", "this video")
 
-        self._status_label.config(text=f"Downloading: {title}")
+        self._status_label.configure(text=f"Downloading: {title}")
         self._explore_controller.download(
             url, mode, quality, base_path,
             update_status=self._on_download_status,
         )
 
     def _on_download_status(self, status: str):
-        self._status_label.config(text=status)
+        self._status_label.configure(text=status)

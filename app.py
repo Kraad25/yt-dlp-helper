@@ -13,6 +13,7 @@ _bootstrap_libs_path()
 
 import tkinter as tk
 from tkinter import messagebox
+import customtkinter as ctk
 
 from view.theme import AppTheme
 from view.home_view import HomeView
@@ -27,16 +28,22 @@ from service.encoder_test_service import EncoderTestService
 
 VERSION = "1.3.0"
 
+MIN_WINDOW_HEIGHT = 600
+MIN_WINDOW_WIDTH = 560
+MAX_WINDOW_HEIGHT = 600
+MAX_WINDOW_WIDTH = 900
 class App:
     def __init__(self):
-        self.root = tk.Tk()
-        self.theme = AppTheme()
+        AppTheme.apply_global_theme()
+
+        self.root = ctk.CTk()
 
         self._home_view: HomeView = None
         self._explorer_view: ExplorerView = None
         self._download_controller: DownloadController = None
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
+        self._explore_folder_controller: FolderController = None
 
         self._update_service: UpdateService = None
 
@@ -66,18 +73,16 @@ class App:
 
     def _setup_window(self):
         self.root.title(f"Media Downloader {VERSION}")
-        self.root.resizable(False, False)
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
 
-        window_width = 560
-        window_height = 600
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-
-        x_position = int(screen_width * 0.3)
-        y_position = int(screen_height * 0.1)
-
-        self.root.geometry(f'{window_width}x{window_height}+{x_position}+{y_position}')
-        self.root.configure(background=self.theme.get_background_color())
+        x_position = int(screen_width * 0.25)
+        y_position = int(screen_height * 0.15)
+        self.root.geometry(f'{MAX_WINDOW_WIDTH}x{MAX_WINDOW_HEIGHT}+{x_position}+{y_position}')
+        self.root.minsize(width=MIN_WINDOW_WIDTH, height=MIN_WINDOW_HEIGHT)
+        self.root.maxsize(width=MAX_WINDOW_WIDTH, height=MAX_WINDOW_HEIGHT)
 
     def _create_menu_bar(self):
         menubar = tk.Menu(self.root)
@@ -141,15 +146,15 @@ class App:
 
     def _initialize_views(self):
         self._home_view = HomeView(self.root)
-        self._explorer_view = ExplorerView(self.root)
+        self._home_view.grid(row=0, column=0, sticky="nsew")
 
-        for view in (self._explorer_view, self._home_view):
-            view.place(x=0, y=0, width=560, height=600)
-            view.pack_propagate(False)
+        self._explorer_view = ExplorerView(self.root)
+        self._explorer_view.grid(row=0, column=0, sticky="nsew")
 
     def _initialize_controllers(self):
         self._download_controller = DownloadController()
         self._folder_controller = FolderController(self._home_view.set_base_folder_path)
+        self._explore_folder_controller = FolderController(self._explorer_view.set_base_folder_path)
         self._explore_controller = ExploreController(self._download_controller)
         self._update_service = UpdateService()
 
@@ -160,10 +165,9 @@ class App:
         )
         self._explorer_view.set_controllers(
             explore_controller=self._explore_controller,
-            folder_controller=self._folder_controller,
+            folder_controller=self._explore_folder_controller,
         )
-
-        self._folder_controller.add_base_folder_listener(self._explorer_view.set_base_folder_path)
+                
         self._home_view.set_cancel_callback(self._download_controller.cancel_download)
 
     def _show_home(self):

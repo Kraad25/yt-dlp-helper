@@ -1,42 +1,32 @@
-import tkinter as tk
-from tkinter import ttk
+import customtkinter
 
-class CustomComboBox:
+class CustomComboBox:    
 
-    def __init__(self, parent, mode, posx=0, posy=0, width=20,):
+    AUDIO_QUALITIES = ["128 kbps", "192 kbps", "256 kbps", "320 kbps"]
+    VIDEO_QUALITIES = ["360p", "480p", "720p", "1080p", "2K", "4K"]
+
+    def __init__(self, parent, mode_var, width: int = 140):
         self._parent = parent
-        self._posx = posx
-        self._posy = posy
-        self._width=width
-        
-        self._var = tk.StringVar(value="192 kbps")
-    
-        self._AUDIO_QUALITIES = ["128 kbps", "192 kbps", "256 kbps", "320 kbps"]
-        self._VIDEO_QUALITIES = ["360p", "480p", "720p", "1080p", "2K", "4K"]
-        
-    def make_combobox(self):
-        self.combobox = ttk.Combobox(self._parent, 
-                                        textvariable = self._var, 
-                                        values = self._AUDIO_QUALITIES, 
-                                        state = "readonly", 
-                                        width = self._width
-                                    )
-        self.combobox.place(x=self._posx, y=self._posy)
+        self._mode_var = mode_var
+        self._var = customtkinter.StringVar(value=self.AUDIO_QUALITIES[1])
 
-    def switch_mode(self, mode):
-        if mode == "mp3":
-            self.combobox['values'] = self._AUDIO_QUALITIES
-            self.set_value(self._AUDIO_QUALITIES[0])
+        self.widget = customtkinter.CTkOptionMenu(
+            parent,
+            variable=self._var,
+            values=self.AUDIO_QUALITIES,
+            width=width,
+        )
 
-        if mode == "mp4":
-            self.combobox['values'] = self._VIDEO_QUALITIES
-            self.set_value(self._VIDEO_QUALITIES[0])
+    def switch_mode(self, mode: str):
+        values = self.AUDIO_QUALITIES if mode == "mp3" else self.VIDEO_QUALITIES
+        self.widget.configure(values=values)
+        self.set_value(values[0])
 
-    def set_value(self, value):
-        options = self.combobox['values']
+    def set_value(self, value: str):
+        options = self.widget.cget("values")
         if value not in options:
             value = options[0]
         self._var.set(value)
 
-    def get_value(self):
+    def get_value(self) -> str:
         return self._var.get()
