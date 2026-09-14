@@ -33,6 +33,18 @@ class ExploreController:
         thread = threading.Thread(target=self._run_search, args=(query, on_results, on_error), daemon=True)
         thread.start()
 
+    def browse_channel(self, channel_url: str, on_ready: Callable, on_error: Callable = None):        
+        thread = threading.Thread(
+            target=self._run_browse_channel, args=(channel_url, on_ready, on_error), daemon=True
+        )
+        thread.start()
+
+    def browse_section(self, section_url: str, on_ready: Callable, on_error: Callable = None):
+        thread = threading.Thread(
+            target=self._run_browse_section, args=(section_url, on_ready, on_error), daemon=True
+        )
+        thread.start()
+
     def get_thumbnail(self, thumbnail_url: str, widget: object, on_ready: Callable):
         self._thumbnail_service.fetch_async(thumbnail_url, widget, on_ready)
 
@@ -64,6 +76,22 @@ class ExploreController:
         try:
             results = self._youtube_model.search_videos(query)
             on_results(results)
+        except Exception as e:
+            if on_error:
+                on_error(str(e))
+
+    def _run_browse_channel(self, channel_url: str, on_ready: Callable, on_error: Callable):
+        try:
+            sections = self._youtube_model.get_channel_sections(channel_url)
+            on_ready(sections)
+        except Exception as e:
+            if on_error:
+                on_error(str(e))
+
+    def _run_browse_section(self, section_url: str, on_ready: Callable, on_error: Callable):
+        try:
+            items = self._youtube_model.get_section_contents(section_url)
+            on_ready(items)
         except Exception as e:
             if on_error:
                 on_error(str(e))

@@ -25,18 +25,6 @@ class ThumbnailService:
 
     # Public Methods
     def fetch_async(self, url: str, widget: object, on_ready: Callable):
-        """
-        Fetches (disk cache first, network otherwise) and resizes a
-        thumbnail on a background thread, then hands the resulting PIL
-        Image back to on_ready() on the Tkinter main thread.
-
-        Tkinter's own image type (PhotoImage) must be created on the main
-        thread, so this service only ever deals in plain PIL Images - the
-        caller does the final ImageTk.PhotoImage(...) conversion itself,
-        after receiving the callback. `widget` just needs to be any live
-        Tkinter widget, used purely to schedule that hop back to the main
-        thread via .after().
-        """
         if not url:
             return
         thread = threading.Thread(
