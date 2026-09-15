@@ -148,6 +148,9 @@ class ExplorerView(BaseView):
             update_status=self._update_status,
         )
 
+    def _on_add_section_to_watchlist(self):
+        pass
+
     # Navigation
     def _set_view_mode(self, mode: str):
         self._view_mode = mode
@@ -168,19 +171,74 @@ class ExplorerView(BaseView):
         pass # CTk widgets are themed via themes/warm_refined.json
 
     def _create_widgets(self):
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(self.ROW_RESULTS, weight=1)
+        self.grid_columnconfigure(0, weight=0)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-        self._title = self._create_header()
-        self._destination_entry, self._browse_button = self._create_destination_input()
-        self._mode_segmented, self._quality_selector = self._create_mode_and_quality()        
-        self._results_frame, self._search_entry, self._back_button = self._create_results_area()
-        self._status_label = self._create_status_label()
-        self._context_menu = self._create_context_menu()
+        sidebar_frame = customtkinter.CTkFrame(self, width=200)
+        sidebar_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 0), pady=10)
+        self._setup_sidebar_grid(sidebar_frame)
 
-    def _create_header(self):
+        main_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        main_frame.grid(row=0, column=1, sticky="nsew")
+        self._setup_main_ui_grid(main_frame)
+
+    def _setup_sidebar_grid(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(2, weight=1)
+        parent.grid_rowconfigure(4, weight=1)
+
+        header = customtkinter.CTkLabel(
+            parent, 
+            text="Watch List", 
+            font=customtkinter.CTkFont(size=16, weight="bold")
+        )
+        header.grid(row=0, column=0, padx=12, pady=(15, 10), sticky="n")
+
+        active_label = customtkinter.CTkLabel(
+            parent, 
+            text="Active", 
+            font=customtkinter.CTkFont(size=13, weight="bold"),
+            text_color="gray50"
+        )
+        active_label.grid(row=1, column=0, padx=12, pady=(5, 2), sticky="w")
+
+        self._active_watchlist_frame = customtkinter.CTkScrollableFrame(
+            parent, 
+            fg_color="transparent",
+            height=180
+        )
+        self._active_watchlist_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=(0, 10))
+
+        paused_label = customtkinter.CTkLabel(
+            parent, 
+            text="Paused", 
+            font=customtkinter.CTkFont(size=13, weight="bold"),
+            text_color="gray50"
+        )
+        paused_label.grid(row=3, column=0, padx=12, pady=(5, 2), sticky="w")
+
+        self._paused_watchlist_frame = customtkinter.CTkScrollableFrame(
+            parent, 
+            fg_color="transparent",
+            height=180
+        )
+        self._paused_watchlist_frame.grid(row=4, column=0, sticky="nsew", padx=5, pady=(0, 10))
+
+    def _setup_main_ui_grid(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(self.ROW_RESULTS, weight=1)
+
+        self._title = self._create_header(parent)
+        self._destination_entry, self._browse_button = self._create_destination_input(parent)
+        self._mode_segmented, self._quality_selector = self._create_mode_and_quality(parent)        
+        self._results_frame, self._search_entry, self._back_button = self._create_results_area(parent)
+        self._status_label = self._create_status_label(parent)
+        self._context_menu = self._create_context_menu(parent)
+
+    def _create_header(self, parent):
         title_label = customtkinter.CTkLabel(
-            self,
+            parent,
             text="Explore YouTube",
             font=customtkinter.CTkFont(size=18, weight="bold"),
         )
@@ -188,11 +246,11 @@ class ExplorerView(BaseView):
 
         return title_label
 
-    def _create_destination_input(self):
-        destination_label = customtkinter.CTkLabel(self, text="Destination", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
+    def _create_destination_input(self, parent):
+        destination_label = customtkinter.CTkLabel(parent, text="Destination", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
         destination_label.grid(row=self.ROW_DEST_LABEL, column=0, sticky="w", padx=30)
 
-        dest_row = customtkinter.CTkFrame(self, fg_color="transparent")
+        dest_row = customtkinter.CTkFrame(parent, fg_color="transparent")
         dest_row.grid(row=self.ROW_DEST_ROW, column=0, sticky="ew", padx=30, pady=(2, 15))
         dest_row.grid_columnconfigure(0, weight=1)
         dest_row.grid_columnconfigure(1, weight=0)
@@ -214,8 +272,8 @@ class ExplorerView(BaseView):
 
         return destination_entry, browse_button
 
-    def _create_mode_and_quality(self):
-        group = customtkinter.CTkFrame(self, fg_color="transparent")
+    def _create_mode_and_quality(self, parent):
+        group = customtkinter.CTkFrame(parent, fg_color="transparent")
         group.grid(row=self.ROW_MODE_QUALITY, column=0, sticky="w", padx=30, pady=(0, 15))
 
         segmented_button = customtkinter.CTkSegmentedButton(
@@ -237,8 +295,8 @@ class ExplorerView(BaseView):
 
         return segmented_button, quality_selector
 
-    def _create_results_area(self):
-        panel = customtkinter.CTkFrame(self, fg_color=("gray88", "gray19"), corner_radius=10)
+    def _create_results_area(self, parent):
+        panel = customtkinter.CTkFrame(parent, fg_color=("gray88", "gray19"), corner_radius=10)
         panel.grid(row=self.ROW_RESULTS, column=0, sticky="nsew", padx=30, pady=(0, 10))
         panel.grid_columnconfigure(0, weight=1)
         panel.grid_rowconfigure(2, weight=1)
@@ -277,9 +335,9 @@ class ExplorerView(BaseView):
  
         return results_frame, search_entry, back_button
 
-    def _create_status_label(self):
+    def _create_status_label(self, parent):
         label = customtkinter.CTkLabel(
-            self,
+            parent,
             text="Type something and hit search",
             font=customtkinter.CTkFont(size=12, slant="italic"),
             text_color="gray50",
@@ -288,9 +346,9 @@ class ExplorerView(BaseView):
         label.grid(row=self.ROW_STATUS, column=0, sticky="w", padx=30, pady=(0, 15))
         return label
 
-    def _create_context_menu(self):
+    def _create_context_menu(self, parent):
         import tkinter as tk
-        menu = tk.Menu(self, tearoff=0)
+        menu = tk.Menu(parent, tearoff=0)
         return menu
     
     def _clear_results(self):

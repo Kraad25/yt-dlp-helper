@@ -28,8 +28,9 @@ from service.encoder_test_service import EncoderTestService
 
 VERSION = "1.3.0"
 
+# Locked for now
 MIN_WINDOW_HEIGHT = 600
-MIN_WINDOW_WIDTH = 560
+MIN_WINDOW_WIDTH = 900
 MAX_WINDOW_HEIGHT = 600
 MAX_WINDOW_WIDTH = 900
 class App:
