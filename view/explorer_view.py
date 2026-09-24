@@ -3,6 +3,7 @@ from typing import Callable
 
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox
+from view.custom_dialogbox import AddWatchChannelDialog
 
 from controller.folder_controller import FolderController
 from controller.explore_controller import ExploreController
@@ -45,6 +46,7 @@ class ExplorerView(BaseView):
         self._current_sections: list[dict] = []
         self._current_section_title: str = ""
         self._current_section_url: str = ""
+        self._current_channel_name: str = ""
 
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
@@ -54,7 +56,7 @@ class ExplorerView(BaseView):
     # Public Methods
     def set_controllers(self, explore_controller: ExploreController, folder_controller: FolderController):
         self._explore_controller = explore_controller
-        self._folder_controller = folder_controller
+        self._folder_controller = folder_controller        
 
     def set_base_folder_path(self, path: str):
         if self._destination_entry:
@@ -82,11 +84,12 @@ class ExplorerView(BaseView):
         self._update_status(f"Searching for '{query}'...")
         self._explore_controller.search(query, self._on_results_ready, self._on_search_error)
 
-    def _on_channel_clicked(self, channel_url: str):
+    def _on_channel_clicked(self, channel_url: str, channel_name: str = ""):
         if not channel_url:
             self._update_status("This result has no channel link.")
             return
 
+        self._current_channel_name = channel_name
         self._clear_results()
         self._set_view_mode(ViewMode.CHANNEL)
         self._explore_controller.browse_channel(channel_url, self._on_sections_ready, self._on_browse_error)
@@ -149,7 +152,15 @@ class ExplorerView(BaseView):
         )
 
     def _on_add_section_to_watchlist(self):
-        pass
+        base_folder = self._destination_entry.get().strip()
+        default_destination = self._folder_controller.build_target_path(base_folder, self._current_channel_name)
+        AddWatchChannelDialog(
+        self,
+        channel_name=self._current_channel_name,
+        section_title=self._current_section_title,
+        default_destination=default_destination,
+        on_confirm=lambda *args: print("confirmed:", args),  # placeholder — next step wires this for real
+    )
 
     # Navigation
     def _set_view_mode(self, mode: str):
@@ -486,8 +497,9 @@ class ExplorerView(BaseView):
  
         if clickable_channel and type != "playlist":
             channel_url = entry.get("channel_url")
+            channel_name = entry.get("channel", "")
             subtitle_label.configure(cursor="hand2")
-            subtitle_label.bind("<Button-1>", lambda e, url=channel_url: self._on_channel_clicked(url))
+            subtitle_label.bind("<Button-1>", lambda e, url=channel_url, name=channel_name: self._on_channel_clicked(url, name))
  
         for widget in (row, thumb_label, text_frame):
             widget.bind("<Button-3>", lambda e, data=entry: self._on_item_right_clicked(e, data))

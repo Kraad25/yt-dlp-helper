@@ -22,8 +22,8 @@ from view.explorer_view import ExplorerView
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
 from controller.explore_controller import ExploreController
-from service.update_service import UpdateService
 
+from service.update_service import UpdateService
 from service.encoder_test_service import EncoderTestService
 
 VERSION = "1.3.0"
@@ -41,6 +41,7 @@ class App:
 
         self._home_view: HomeView = None
         self._explorer_view: ExplorerView = None
+
         self._download_controller: DownloadController = None
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
@@ -157,7 +158,6 @@ class App:
         self._folder_controller = FolderController(self._home_view.set_base_folder_path)
         self._explore_folder_controller = FolderController(self._explorer_view.set_base_folder_path)
         self._explore_controller = ExploreController(self._download_controller)
-        self._update_service = UpdateService()
 
     def _wire_controllers_to_views(self):
         self._home_view.set_controllers(
@@ -188,8 +188,9 @@ class App:
         )
 
     def _check_for_updates(self):        
-        self._home_view.update_status("Checking and Updating")
+        self._update_service = UpdateService()
 
+        self._home_view.update_status("Checking and Updating")
         self._update_service.update_program(update_status = self._change_status_for_updates)
 
     def _change_status_for_updates(self, message):
