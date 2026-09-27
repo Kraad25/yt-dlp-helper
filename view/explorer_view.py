@@ -3,7 +3,7 @@ from typing import Callable
 
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox
-from view.custom_dialogbox import AddWatchChannelDialog
+from view.custom_dialogbox import AddWatchChannelDialog, BackFillDialog
 
 from controller.folder_controller import FolderController
 from controller.explore_controller import ExploreController
@@ -47,6 +47,7 @@ class ExplorerView(BaseView):
         self._current_section_title: str = ""
         self._current_section_url: str = ""
         self._current_channel_name: str = ""
+        self._current_section_items: list[dict] = []
 
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
@@ -159,7 +160,7 @@ class ExplorerView(BaseView):
         channel_name=self._current_channel_name,
         section_title=self._current_section_title,
         default_destination=default_destination,
-        on_confirm=lambda *args: print("confirmed:", args),  # placeholder — next step wires this for real
+        on_confirm=self._on_watch_channel_confirmed,
     )
 
     # Navigation
@@ -386,12 +387,29 @@ class ExplorerView(BaseView):
         self._update_status("Pick a tab to browse" if sections else "No sections found for this channel.")
 
     def _on_section_items_ready(self, items: list):
+        self._current_section_items = items
+
         if not items:
             self._update_status(f"{self._current_section_title}: nothing here yet.")
             return
         self._update_status(f"{self._current_section_title}: {len(items)} items")
         for index, entry in enumerate(items):
             self._render_item_row(entry, index, clickable_channel=False)
+
+    def _on_watch_channel_confirmed(self, display_name, destination, auto_download, poll_interval):
+        print("watch config:", display_name, destination, auto_download, poll_interval)  # still a placeholder until watcher_controller exists
+
+        # Ask the controller for all the results in this section. Not a few, all.
+        # self._current_section_items = None 
+
+        if not self._current_section_items:
+            return
+
+        BackFillDialog(
+            self,
+            items=self._current_section_items,
+            on_confirm=lambda selected_ids: print("backfill selected:", selected_ids),  # placeholder too
+        )
 
     def _on_search_error(self, error_message: str):
         self._update_status(f"Search failed: {error_message}")

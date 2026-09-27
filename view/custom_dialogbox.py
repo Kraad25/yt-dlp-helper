@@ -44,8 +44,9 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
             raw = self._custom_interval_entry.get().strip()
             poll_interval = int(raw) if raw.isdigit() else None
 
+        self.withdraw()
+        self.after(200, self.destroy)
         self._on_confirm(display_name, destination, auto_download, poll_interval)
-        self.destroy()
 
     
     # Private Methods
@@ -142,3 +143,91 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
         next_button = customtkinter.CTkButton(btn_row, text="Next →", command=self._on_submit).grid(row=0, column=1, sticky="ew")
 
         return cancel_button, next_button
+
+
+class BackFillDialog(customtkinter.CTkToplevel):
+    def __init__(self, parent, items: list, on_confirm):
+        super().__init__(parent)
+
+        self._dialog_box_height: int = 420
+        self._dialog_box_width: int = 420
+
+        self._on_confirm = on_confirm
+        self._check_vars = {}
+
+        self._setup_dialog_box(parent, items)
+
+    def _setup_dialog_box(self, parent, items: list):
+        self._setup_window(parent)
+        self._add_widgets(items)
+
+    def _setup_window(self, parent):
+        self.title("Existing Videos")
+
+        screen_width = parent.winfo_screenwidth()
+        screen_height = parent.winfo_screenheight()
+        x_position = int(screen_width * 0.4)
+        y_position = int(screen_height * 0.25)
+
+        self.geometry(f'{self._dialog_box_width}x{self._dialog_box_height}+{x_position}+{y_position}')
+        self.resizable(False, False)
+
+        self.transient(parent)
+        self.grab_set()
+
+    def _add_widgets(self, items: list):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
+        self._add_header(items)
+        self._add_select_all_checkbox()
+        self._add_videos_found(items)
+        self._add_action_buttons()
+
+    def _add_header(self, items: list):
+        header = customtkinter.CTkLabel(
+            self, text=f"{len(items)} existing videos found. Download now, or leave for later?",
+            font=customtkinter.CTkFont(size=13, weight="bold"), wraplength=380, justify="left",
+        )
+        header.grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
+
+    def _add_select_all_checkbox(self):
+        select_all_var = customtkinter.BooleanVar(value=False)
+
+        def _toggle_all():
+            for var in self._check_vars.values():
+                var.set(select_all_var.get())
+
+        select_all_checkbox = customtkinter.CTkCheckBox(self, text="Select All", variable=select_all_var, command=_toggle_all)
+        select_all_checkbox.grid(row=1, column=0, sticky="w", padx=20, pady=(0, 8))
+
+    def _add_videos_found(self, items: list):
+        scroll = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
+        scroll.grid(row=2, column=0, sticky="nsew", padx=20)
+        scroll.grid_columnconfigure(0, weight=1)
+
+        for i, item in enumerate(items):
+            var = customtkinter.BooleanVar(value=False)
+            self._check_vars[item.get("id")] = var
+            customtkinter.CTkCheckBox(scroll, text=item.get("title", "Untitled"), variable=var).grid(row=i, column=0, sticky="w", pady=3)
+
+    def _add_action_buttons(self):
+        btn_row = customtkinter.CTkFrame(self, fg_color="transparent")
+        btn_row.grid(row=3, column=0, sticky="ew", padx=20, pady=20)
+        btn_row.grid_columnconfigure((0, 1), weight=1)
+
+        skip_button = customtkinter.CTkButton(
+            btn_row, text="Skip (watch only)", fg_color="transparent", border_width=1,
+            command=lambda: self._finish(set()),
+        )
+        skip_button.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        confirm_button = customtkinter.CTkButton(btn_row, text="Confirm", command=lambda: self._finish(self._selected_ids()),)
+        confirm_button.grid(row=0, column=1, sticky="ew")
+
+    def _selected_ids(self):
+        return {vid for vid, var in self._check_vars.items() if var.get()}
+
+    def _finish(self, selected_ids):
+        self._on_confirm(selected_ids)
+        self.destroy()
