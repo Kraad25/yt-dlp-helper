@@ -23,6 +23,7 @@ class YoutubeModel:
             'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
+            'ignoreerrors': True,
             'format': 'bestaudio/best',
             'ffmpeg_location': str(self._ffmpeg_dir),
             'postprocessors': [
@@ -58,6 +59,7 @@ class YoutubeModel:
             'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
+            'ignoreerrors': True,
             'ffmpeg_location': str(self._ffmpeg_dir),
             'format': f'bestvideo[ext=mp4][height<={height}]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'merge_output_format': 'mp4',

@@ -1,8 +1,13 @@
 import os
 import sys
+import glob
+import time
+import gc
 import threading
 from typing import Callable
 from pathlib import Path
+
+from yt_dlp.utils import DownloadCancelled
 
 from model.validators import DownloadValidator
 from model.youtube_model import YoutubeModel
@@ -34,8 +39,9 @@ class DownloadController:
         self._update_progress: Callable = None
         self._update_status: Callable = None
         self._cancel_flag = threading.Event()
-        self._expected_filename = None
         self._encoder = "CPU"
+
+        self._partial_files: set[str] = set()
 
     # Public Methods
     def download_requested(
@@ -58,7 +64,10 @@ class DownloadController:
         mode = data.get("mode", "")
         quality = data.get("quality", "")
 
+        self._partial_files.clear()
+
         if not self._validate_data(url, mode):
+            self._enable_cancel(False)
             self._enable_download(True)
             return
 
@@ -110,14 +119,20 @@ class DownloadController:
                                              quality=quality, 
                                              progress_hook = self._progress_hook
                                             )
-            self._update_status("Done")
+
+            if not self._cancel_flag.is_set():
+                self._update_status("Done")
 
         except Exception as e:
+            if not self._cancel_flag.is_set():
+                self._error.handle_error(update_status=self._update_status, error=e)
+
+        finally:
             if self._cancel_flag.is_set():
                 self._cleanup_partial_files()
-            self._error.handle_error(update_status=self._update_status, error=e)
-        finally:
+                self._update_status("Download cancelled")
             self._cancel_flag.clear()
+            self._enable_cancel(False)
             self._enable_download(True)
 
     def _run_video_download(self, url: str, folderPath: str, quality: str):
@@ -128,26 +143,34 @@ class DownloadController:
                 quality=quality,
                 progress_hook = self._progress_hook
             )
-            if downloaded_file and not self._cancel_flag.is_set():
-                self._update_status("Transcoding video...")
-                self._video_processor.transcode(downloaded_file,self._encoder)
-            self._update_status("Done")
+            if not self._cancel_flag.is_set():                
+                if downloaded_file and os.path.exists(downloaded_file):
+                    self._update_status("Transcoding video...")
+                    self._video_processor.transcode(downloaded_file, self._encoder)
+                    self._update_status("Done")
+                else:                
+                    self._update_status("Download failed or video was skipped")
             
         except Exception as e:
+            if not self._cancel_flag.is_set():
+                self._error.handle_error(update_status=self._update_status, error=e)
+
+        finally:
             if self._cancel_flag.is_set():
                 self._cleanup_partial_files()
-            self._error.handle_error(update_status=self._update_status, error=e)
-        finally:
+                self._update_status("Download cancelled")
             self._cancel_flag.clear()
+            self._enable_cancel(False)
             self._enable_download(True)
 
-    def _progress_hook(self, d: dict):        
-        if d['status'] == 'downloading':
-            if 'filename' in d:
-                self._expected_filename = d['filename']
+    def _progress_hook(self, data: dict):        
+        if data['status'] == 'downloading':
+            temp = data.get('tmpfilename')
+            if temp:
+                self._partial_files.add(temp)
                 
-            total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
-            downloaded = d.get('downloaded_bytes', 0)
+            total = data.get('total_bytes') or data.get('total_bytes_estimate', 1)
+            downloaded = data.get('downloaded_bytes', 0)
             percent = int((downloaded / total) * 100)
 
             self._update_progress(percent)
@@ -155,22 +178,32 @@ class DownloadController:
 
             if self._cancel_flag.is_set():
                 self._enable_cancel(False)
-                raise Exception("Download cancelled by user")
+                raise DownloadCancelled("Download cancelled by user")
         
-        elif d['status'] == 'finished':
+        elif data['status'] == 'finished':
             self._update_status("Processing file...")
 
     def _cleanup_partial_files(self):
-        if not self._expected_filename:
-            return
-        
-        part_file = self._expected_filename + ".part"
-        
-        try:
-            if os.path.exists(part_file):
-                os.remove(part_file)
-        except Exception as e:
-            self._error.handle_error(
-                update_status = self._update_status,
-                custom_msg = f"Warning: Could not delete temp file: {e}"   
-            )
+        gc.collect()
+        for temp in self._partial_files:
+            base = temp[:-5] if temp.endswith(".part") else temp
+            targets = [
+                temp,
+                base + ".ytdl",
+                *glob.glob(glob.escape(temp) + "-Frag*"),
+            ]
+            for path in targets:
+                self._remove_with_retry(path)
+
+        self._partial_files.clear()
+
+    def _remove_with_retry(self, path: str, attempts: int = 5, delay: float = 0.5):
+        for _ in range(attempts):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                return
+            except PermissionError as e:
+                time.sleep(delay)
+            except Exception as e:
+                return
