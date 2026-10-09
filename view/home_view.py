@@ -1,3 +1,4 @@
+import tkinter as tk
 import customtkinter
 from typing import Callable
 
@@ -81,6 +82,9 @@ class HomeView(BaseView):
 
     # Event Handlers
     def _on_download_clicked(self):
+        if self._download_button.cget("state") == "disabled":
+            return
+        
         data = self._get_form_data()
         path = data.get("path", "")
 
@@ -158,6 +162,10 @@ class HomeView(BaseView):
 
         url_entry = customtkinter.CTkEntry(self, placeholder_text="Paste a supported URL")
         url_entry.grid(row=self.ROW_URL_ENTRY, column=0, columnspan=2, sticky="ew", padx=30, pady=(2, 15))
+
+        self.attach_entry_context_menu(url_entry) # enables right click option for cut, copy, paste and select all
+        url_entry.bind("<Return>", lambda event: self._on_download_clicked())
+
         return url_entry
 
     def _create_destination_input(self):
@@ -249,6 +257,25 @@ class HomeView(BaseView):
         cancel_button.grid_remove()
 
         return download_button, cancel_button
+
+    def attach_entry_context_menu(self, entry: customtkinter.CTkEntry):
+        inner = entry._entry  # the tk.Entry inside the CTkEntry
+        menu = tk.Menu(inner, tearoff=0)
+
+        menu.add_command(label="Cut", command=lambda: inner.event_generate("<<Cut>>"))
+        menu.add_command(label="Copy", command=lambda: inner.event_generate("<<Copy>>"))
+        menu.add_command(label="Paste", command=lambda: inner.event_generate("<<Paste>>"))
+        menu.add_separator()
+        menu.add_command(label="Select All", command=lambda: inner.select_range(0, "end"))
+
+        def show_menu(event):
+            inner.focus_set()
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        inner.bind("<Button-3>", show_menu)
 
     def _get_form_data(self):
         destination = self._destination_entry.get().strip() if self._destination_entry else ""
