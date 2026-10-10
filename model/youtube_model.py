@@ -106,6 +106,23 @@ class YoutubeModel:
             })
         return results
 
+    def get_url_info(self, url: str) -> dict:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+            'skip_download': True,
+            'playlistend': 1,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        is_playlist = bool(info) and info.get('_type') == 'playlist'
+        return {
+            'is_playlist': is_playlist,
+            'title': info.get('title') if is_playlist else None,
+        }
+
     def get_channel_sections(self, channel_url: str) -> list[dict]:        
         base_url = channel_url.rstrip('/')
         return [
@@ -155,7 +172,6 @@ class YoutubeModel:
         return results
 
     ## Private Methods
-
     def _get_playlist_cover(self, playlist_url: str) -> str | None:
         ydl_opts = {
             'quiet': True,

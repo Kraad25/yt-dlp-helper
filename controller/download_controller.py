@@ -7,13 +7,13 @@ import threading
 from typing import Callable
 from pathlib import Path
 
-from yt_dlp.utils import DownloadCancelled
+from yt_dlp.utils import DownloadCancelled, sanitize_filename
+from urllib.parse import urlparse, parse_qs
 
 from model.validators import DownloadValidator
 from model.youtube_model import YoutubeModel
 from service.error_service import ErrorHandlingService
 from service.video_processing_service import VideoProcessingService
-
 
 def _get_app_root() -> Path:
     if getattr(sys, "frozen", False):
@@ -114,6 +114,9 @@ class DownloadController:
     
     def _run_audio_download(self, url: str, folderPath: str, quality: str):
         try:
+            url = self._normalize_url(url)
+            folderPath = self._resolve_target_dir(url, folderPath)
+
             self._youtube_model.audio_download(url=url, 
                                              out_dir=folderPath, 
                                              quality=quality, 
@@ -137,12 +140,16 @@ class DownloadController:
 
     def _run_video_download(self, url: str, folderPath: str, quality: str):
         try:
+            url = self._normalize_url(url)
+            folderPath = self._resolve_target_dir(url, folderPath)
+
             downloaded_file = self._youtube_model.video_download(
-                url=url,
-                out_dir=folderPath,
-                quality=quality,
-                progress_hook = self._progress_hook
-            )
+                                                url=url,
+                                                out_dir=folderPath,
+                                                quality=quality,
+                                                progress_hook = self._progress_hook
+                                            )
+
             if not self._cancel_flag.is_set():                
                 if downloaded_file and os.path.exists(downloaded_file):
                     self._update_status("Transcoding video...")
@@ -183,6 +190,23 @@ class DownloadController:
         elif data['status'] == 'finished':
             self._update_status("Processing file...")
 
+    def _resolve_target_dir(self, url: str, base_dir: str) -> str:
+        try:
+            info = self._youtube_model.get_url_info(url)
+            if not info.get("is_playlist"):
+                return base_dir
+
+            name = sanitize_filename(info.get("title") or "").strip(" .")
+            if not name:
+                return base_dir
+
+            path = os.path.join(base_dir, name)
+            os.makedirs(path, exist_ok=True)
+            return path.replace("\\", "/")
+        
+        except Exception:
+            return base_dir
+
     def _cleanup_partial_files(self):
         gc.collect()
         for temp in self._partial_files:
@@ -207,3 +231,10 @@ class DownloadController:
                 time.sleep(delay)
             except Exception as e:
                 return
+
+    def _normalize_url(self, url: str) -> str:
+        query = parse_qs(urlparse(url).query)
+        list_id = (query.get("list") or [""])[0]
+        if list_id.startswith(("OLAK5uy", "PL")):
+            return f"https://www.youtube.com/playlist?list={list_id}"
+        return url
