@@ -1,68 +1,41 @@
 import os
 from typing import Callable
+from tkinter import filedialog
 from model.folder_model import FolderModel
 
 class FolderController:
-    def __init__(self, set_base_folder: Callable = None):
-        self._folder_model = FolderModel()
-        self._AUDIO_EXT = (".mp3", ".aac", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma")
-        self._VIDEO_EXT = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv")
-
-        self._base_folder_listeners: list[Callable] = []
-        self._new_path = self._folder_model.get_base_directory()
+    def __init__(self, key: str, set_base_folder: Callable = None):
+        self._model = FolderModel(key)
+        self._listeners: list[Callable] = []
 
         if set_base_folder:
             self.add_base_folder_listener(set_base_folder)
-            self._initialize_folder()
 
     # Public Methods
     def add_base_folder_listener(self, callback: Callable):
-        self._base_folder_listeners.append(callback)
+        self._listeners.append(callback)
+        callback(self.get_base_directory())
 
-        if self._new_path:
-            callback(self._new_path)
+    def get_base_directory(self) -> str:
+        saved = self._model.get_base_directory()
+        if saved and os.path.isdir(saved):
+            return saved
+        return self._default_directory()
 
     def browse_folder(self):
-        folder = self._folder_model.browse_folder()
-        if folder and os.path.exists(folder):
-            self._new_path = folder
-            self._notify_listeners(self._new_path)
-
-    def build_target_path(self, base_dir: str, subfolder: str) -> str:
-        base_dir = (base_dir or "").strip()
-        subfolder = (subfolder or "").strip()
-
-        if base_dir and not subfolder:
-            self._new_path = base_dir
-            return self._new_path
-
-        if base_dir and subfolder:
-            self._new_path = os.path.join(base_dir, subfolder)
-            self._new_path = self._new_path.replace("\\", "/")
-            return self._new_path
-
-    def get_files(self, folder_path, mode):
-        if mode == "mp3":
-            extensions = self._AUDIO_EXT
-        elif mode == "mp4":
-            extensions = self._VIDEO_EXT
-
-        return [
-            f for f in os.listdir(folder_path)
-            if os.path.isfile(os.path.join(folder_path, f)) and f.lower().endswith(extensions)
-        ]
+        selected = filedialog.askdirectory(initialdir=self.get_base_directory())
+        if not selected:
+            return
+        self._model.set_base_directory(selected)
+        self._notify_listeners(selected)
+    
+    def normalize_path(self, path: str) -> str:
+        return (path or "").strip().replace("\\", "/")
 
     # Private Methods
-    def _initialize_folder(self):
-        folder_path = self._folder_model.get_base_directory()
-
-        if folder_path and os.path.exists(folder_path):
-            self._notify_listeners(folder_path)
-        else:
-            default_path = os.path.expanduser("~/Documents")
-            default_path = default_path.replace("\\", "/")
-            self._notify_listeners(default_path)
+    def _default_directory(self) -> str:
+        return os.path.expanduser("~/Documents").replace("\\", "/")
 
     def _notify_listeners(self, path: str):
-        for callback in self._base_folder_listeners:
+        for callback in self._listeners:
             callback(path)

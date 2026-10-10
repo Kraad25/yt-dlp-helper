@@ -33,6 +33,10 @@ MIN_WINDOW_HEIGHT = 600
 MIN_WINDOW_WIDTH = 900
 MAX_WINDOW_HEIGHT = 600
 MAX_WINDOW_WIDTH = 900
+
+MANUAL_DOWNLOAD_DIR_KEY = "manual_download_base_dir"
+EXPLORE_DOWNLOAD_DIR_KEY = "explore_download_base_dir"
+
 class App:
     def __init__(self):
         AppTheme.apply_global_theme()
@@ -155,8 +159,8 @@ class App:
 
     def _initialize_controllers(self):
         self._download_controller = DownloadController()
-        self._folder_controller = FolderController(self._home_view.set_base_folder_path)
-        self._explore_folder_controller = FolderController(self._explorer_view.set_base_folder_path)
+        self._folder_controller = FolderController(MANUAL_DOWNLOAD_DIR_KEY, self._home_view.set_base_folder_path)
+        self._explore_folder_controller = FolderController(EXPLORE_DOWNLOAD_DIR_KEY, self._explorer_view.set_base_folder_path)
         self._explore_controller = ExploreController(self._download_controller)
 
     def _wire_controllers_to_views(self):

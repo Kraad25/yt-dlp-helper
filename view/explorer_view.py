@@ -1,3 +1,5 @@
+import os
+
 import customtkinter
 from typing import Callable
 
@@ -154,7 +156,7 @@ class ExplorerView(BaseView):
 
     def _on_add_section_to_watchlist(self):
         base_folder = self._destination_entry.get().strip()
-        default_destination = self._folder_controller.build_target_path(base_folder, self._current_channel_name)
+        default_destination = self._folder_controller.normalize_path(os.path.join(base_folder, self._current_channel_name))
         AddWatchChannelDialog(
         self,
         channel_name=self._current_channel_name,

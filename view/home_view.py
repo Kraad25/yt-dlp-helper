@@ -279,7 +279,7 @@ class HomeView(BaseView):
 
     def _get_form_data(self):
         destination = self._destination_entry.get().strip() if self._destination_entry else ""
-        path = self._folder_controller.build_target_path(destination, "")
+        path = self._folder_controller.normalize_path(destination)
 
         return {
             "url": self._url_entry.get().strip() if self._url_entry else "",
