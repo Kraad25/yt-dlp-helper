@@ -71,6 +71,8 @@ class App:
 
         tester = EncoderTestService()
         tester.list_available_encoder(self._on_encoders_detected)
+
+        self._update_service = UpdateService()
         
         try:
             self.root.iconbitmap('flag.ico')
@@ -182,18 +184,25 @@ class App:
         self._explorer_view.tkraise()
 
     def _show_about(self):
+        yt_dlp_version = ""
+        ffmpeg_version = ""
+        if self._update_service:
+            yt_dlp_version = self._update_service.get_ytdlp_version()
+            ffmpeg_version = self._update_service.get_ffmpeg_version()
+
         messagebox.showinfo(
             "About",
             f"YouTube Converter {VERSION}\n\n"
             "This program uses yt-dlp for downloading and processing media.\n"
             "Project page and supported sites:\n"
             "https://github.com/yt-dlp/yt-dlp\n\n"
-            "See the yt-dlp repository for full licensing information."
+            "See the yt-dlp repository for full licensing information.\n\n"
+
+            f"yt-dlp version {yt_dlp_version}\n"
+            f"ffmpeg version {ffmpeg_version}"
         )
 
     def _check_for_updates(self):        
-        self._update_service = UpdateService()
-
         self._home_view.update_status("Checking and Updating")
         self._update_service.update_program(update_status = self._change_status_for_updates)
 
