@@ -117,14 +117,18 @@ class DownloadController:
             url = self._normalize_url(url)
             folderPath = self._resolve_target_dir(url, folderPath)
 
-            self._youtube_model.audio_download(url=url, 
+            downloaded_files = self._youtube_model.audio_download(url=url, 
                                              out_dir=folderPath, 
                                              quality=quality, 
                                              progress_hook = self._progress_hook
                                             )
 
             if not self._cancel_flag.is_set():
-                self._update_status("Done")
+                saved = [file for file in downloaded_files if os.path.exists(file)]
+                if saved:
+                    self._update_status("Done")
+                else:
+                    self._update_status("Download failed, nothing was saved")
 
         except Exception as e:
             if not self._cancel_flag.is_set():
@@ -143,7 +147,7 @@ class DownloadController:
             url = self._normalize_url(url)
             folderPath = self._resolve_target_dir(url, folderPath)
 
-            downloaded_file = self._youtube_model.video_download(
+            downloaded_files = self._youtube_model.video_download(
                                                 url=url,
                                                 out_dir=folderPath,
                                                 quality=quality,
@@ -151,12 +155,16 @@ class DownloadController:
                                             )
 
             if not self._cancel_flag.is_set():                
-                if downloaded_file and os.path.exists(downloaded_file):
-                    self._update_status("Transcoding video...")
-                    self._video_processor.transcode(downloaded_file, self._encoder)
-                    self._update_status("Done")
-                else:                
-                    self._update_status("Download failed or video was skipped")
+                saved = [file for file in downloaded_files if os.path.exists(file)]
+
+                if not saved:
+                    self._update_status("Download failed, nothing was saved")
+                else:
+                    for i, file in enumerate(saved, 1):
+                        self._update_status(f"Transcoding {i}/{len(saved)} ...")
+                        self._video_processor.transcode(file, self._encoder)
+
+                    self._update_status(f"Done: {len(saved)} downloaded")
             
         except Exception as e:
             if not self._cancel_flag.is_set():

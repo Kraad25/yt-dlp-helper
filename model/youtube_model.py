@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+_FILE_HOOK_PP = 'MoveFiles'
 
 class YoutubeModel:
     def __init__(self, ffmpeg_dir: Path= None):
@@ -18,6 +19,7 @@ class YoutubeModel:
 
     def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None):
         quality_value = quality.split()[0]  # "192 kbps" -> "192"
+        downloaded_files = []
 
         ydl_opts = {
             'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
@@ -35,15 +37,19 @@ class YoutubeModel:
                 {
                     'key': 'FFmpegMetadata',
                 }
-            ]
+            ],
+            'postprocessor_hooks': [self._make_file_collector(downloaded_files)],
         }
         if progress_hook:
             ydl_opts['progress_hooks'] = [progress_hook]
+            
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
+        return downloaded_files
+
     def video_download(self, url, out_dir, quality='720p', progress_hook=None):
-        downloaded_file = None
+        downloaded_files = []
 
         quality_map = {
             "360p": 360,
@@ -65,15 +71,16 @@ class YoutubeModel:
             'merge_output_format': 'mp4',
             'postprocessors': [
                 {'key': 'FFmpegMetadata'},
-            ]
+            ],
+            'postprocessor_hooks': [self._make_file_collector(downloaded_files)],
         }
         if progress_hook:
             ydl_opts['progress_hooks'] = [progress_hook]
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-            downloaded_file = ydl.prepare_filename(ydl.extract_info(url, download=False))
-        return downloaded_file
+
+        return downloaded_files
 
     def search_videos(self, query: str, limit: int = 8) -> list[dict]:
         ydl_opts = {
@@ -172,6 +179,14 @@ class YoutubeModel:
         return results
 
     ## Private Methods
+    def _make_file_collector(self, files: list):
+        def hook(data):
+            if data.get('status') == 'finished' and data.get('postprocessor') == _FILE_HOOK_PP:
+                path = (data.get('info_dict') or {}).get('filepath')
+                if path:
+                    files.append(path)
+        return hook
+
     def _get_playlist_cover(self, playlist_url: str) -> str | None:
         ydl_opts = {
             'quiet': True,
