@@ -1,5 +1,9 @@
 import customtkinter
+from tkinter import ttk
 from tkinter import filedialog
+
+CHECKED = "☑"
+UNCHECKED = "☐"
 
 class AddWatchChannelDialog(customtkinter.CTkToplevel):
     def __init__(self, parent, channel_name, section_title, default_destination, on_confirm):
@@ -27,10 +31,10 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
         self._custom_interval_entry.configure(state="normal" if self._interval_mode_var.get() == "custom" else "disabled")
 
     def _on_browse(self):
-        folder = filedialog.askdirectory(initialdir=self._dest_entry.get())
+        folder = filedialog.askdirectory(initialdir=self._destination_entry.get())
         if folder:
-            self._dest_entry.delete(0, "end")
-            self._dest_entry.insert(0, folder)
+            self._destination_entry.delete(0, "end")
+            self._destination_entry.insert(0, folder)
 
     def _on_submit(self):
         display_name = self._display_name_entry.get().strip()
@@ -153,7 +157,10 @@ class BackFillDialog(customtkinter.CTkToplevel):
         self._dialog_box_width: int = 420
 
         self._on_confirm = on_confirm
-        self._check_vars = {}
+        self._items: dict = {}
+        self._checked: dict = {}
+        self._tree = None
+        self._select_all_var = None
 
         self._setup_dialog_box(parent, items)
 
@@ -192,24 +199,36 @@ class BackFillDialog(customtkinter.CTkToplevel):
         header.grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
 
     def _add_select_all_checkbox(self):
-        select_all_var = customtkinter.BooleanVar(value=False)
-
-        def _toggle_all():
-            for var in self._check_vars.values():
-                var.set(select_all_var.get())
-
-        select_all_checkbox = customtkinter.CTkCheckBox(self, text="Select All", variable=select_all_var, command=_toggle_all)
-        select_all_checkbox.grid(row=1, column=0, sticky="w", padx=20, pady=(0, 8))
+        self._select_all_var = customtkinter.BooleanVar(value=False)
+        checkbox = customtkinter.CTkCheckBox(
+            self, text="Select All", variable=self._select_all_var, command=self._on_select_all_toggled
+        )
+        checkbox.grid(row=1, column=0, sticky="w", padx=20, pady=(0, 8))
 
     def _add_videos_found(self, items: list):
-        scroll = customtkinter.CTkScrollableFrame(self, fg_color="transparent")
-        scroll.grid(row=2, column=0, sticky="nsew", padx=20)
-        scroll.grid_columnconfigure(0, weight=1)
+        self._items = {item["id"]: item for item in items}
+        self._checked = {item_id: False for item_id in self._items}
 
-        for i, item in enumerate(items):
-            var = customtkinter.BooleanVar(value=False)
-            self._check_vars[item.get("id")] = var
-            customtkinter.CTkCheckBox(scroll, text=item.get("title", "Untitled"), variable=var).grid(row=i, column=0, sticky="w", pady=3)
+        container = customtkinter.CTkFrame(self, fg_color="transparent")
+        container.grid(row=2, column=0, sticky="nsew", padx=20)
+        container.grid_columnconfigure(0, weight=1)
+        container.grid_rowconfigure(0, weight=1)
+
+        self._tree = ttk.Treeview(container, columns=("check", "title"), show="headings", selectmode="none")
+        self._tree.heading("check", text="")
+        self._tree.heading("title", text="Title", anchor="w")
+        self._tree.column("check", width=30, anchor="center", stretch=False)
+        self._tree.column("title", anchor="w")
+        self._tree.grid(row=0, column=0, sticky="nsew")
+
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=self._tree.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self._tree.configure(yscrollcommand=scrollbar.set)
+
+        for item_id, item in self._items.items():
+            self._tree.insert("", "end", iid=item_id, values=(UNCHECKED, item.get("title", "Untitled")))
+
+        self._tree.bind("<Button-1>", self._on_tree_clicked)
 
     def _add_action_buttons(self):
         btn_row = customtkinter.CTkFrame(self, fg_color="transparent")
@@ -218,15 +237,29 @@ class BackFillDialog(customtkinter.CTkToplevel):
 
         skip_button = customtkinter.CTkButton(
             btn_row, text="Skip (watch only)", fg_color="transparent", border_width=1,
-            command=lambda: self._finish(set()),
+            command=lambda: self._finish([]),
         )
         skip_button.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
-        confirm_button = customtkinter.CTkButton(btn_row, text="Confirm", command=lambda: self._finish(self._selected_ids()),)
+        confirm_button = customtkinter.CTkButton(btn_row, text="Confirm", command=lambda: self._finish(self._selected_items()),)
         confirm_button.grid(row=0, column=1, sticky="ew")
 
-    def _selected_ids(self):
-        return {vid for vid, var in self._check_vars.items() if var.get()}
+    def _on_tree_clicked(self, event):
+        item_id = self._tree.identify_row(event.y)
+        if item_id:
+            self._set_checked(item_id, not self._checked[item_id])
+
+    def _on_select_all_toggled(self):
+        checked = self._select_all_var.get()
+        for item_id in self._checked:
+            self._set_checked(item_id, checked)
+
+    def _set_checked(self, item_id: str, checked: bool):
+        self._checked[item_id] = checked
+        self._tree.set(item_id, "check", CHECKED if checked else UNCHECKED)
+
+    def _selected_items(self) -> list:
+        return [self._items[item_id] for item_id, checked in self._checked.items() if checked]
 
     def _finish(self, selected_ids):
         self._on_confirm(selected_ids)

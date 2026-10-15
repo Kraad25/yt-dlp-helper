@@ -3,10 +3,11 @@ import threading
 from pathlib import Path
 from typing import Callable
 
-from model.youtube_model import YoutubeModel
-from service.thumbnail_service import ThumbnailService
+from model.youtube_model import YoutubeModel, SECTION_INDEX_LIMIT
 from controller.download_controller import DownloadController
 
+from service.thumbnail_service import ThumbnailService
+from service.search_page_service import SearchPageService
 
 def _get_app_root() -> Path:
     if getattr(sys, "frozen", False):
@@ -25,12 +26,17 @@ class ExploreController:
         ffmpeg_dir = _get_ffmpeg_dir(app_root)
 
         self._youtube_model = YoutubeModel(ffmpeg_dir)
+        self._search_pager = SearchPageService(fetch=self._youtube_model.search_videos)
         self._thumbnail_service = ThumbnailService()
         self._download_controller = download_controller
 
     # Public Methods
     def search(self, query: str, on_results: Callable, on_error: Callable = None):        
         thread = threading.Thread(target=self._run_search, args=(query, on_results, on_error), daemon=True)
+        thread.start()
+
+    def show_more_search(self, on_results: Callable, on_error: Callable = None):
+        thread = threading.Thread(target=self._run_show_more_search, args=(on_results, on_error), daemon=True)
         thread.start()
 
     def browse_channel(self, channel_url: str, on_ready: Callable, on_error: Callable = None):        
@@ -47,6 +53,12 @@ class ExploreController:
 
     def get_thumbnail(self, thumbnail_url: str, widget: object, on_ready: Callable):
         self._thumbnail_service.fetch_async(thumbnail_url, widget, on_ready)
+
+    def list_section(self, section_url: str, on_ready: Callable, on_error: Callable = None):
+        thread = threading.Thread(
+            target=self._run_list_section, args=(section_url, on_ready, on_error), daemon=True
+        )
+        thread.start()
 
     def download(
         self,
@@ -74,8 +86,25 @@ class ExploreController:
     # Private Methods
     def _run_search(self, query: str, on_results: Callable, on_error: Callable):
         try:
-            results = self._youtube_model.search_videos(query)
-            on_results(results)
+            batch = self._search_pager.start(query)
+            on_results(batch, self._search_pager.has_more())
+        except Exception as e:
+            if on_error:
+                on_error(str(e))
+
+    def _run_list_section(self, section_url: str, on_ready: Callable, on_error: Callable):
+        try:
+            items = self._youtube_model.get_section_index(section_url)
+            truncated = len(items) >= SECTION_INDEX_LIMIT
+            on_ready(items, truncated)
+        except Exception as e:
+            if on_error:
+                on_error(str(e))
+
+    def _run_show_more_search(self, on_results: Callable, on_error: Callable):
+        try:
+            batch = self._search_pager.next_page()
+            on_results(batch, self._search_pager.has_more())
         except Exception as e:
             if on_error:
                 on_error(str(e))

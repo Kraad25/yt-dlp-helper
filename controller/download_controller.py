@@ -164,7 +164,7 @@ class DownloadController:
                         self._update_status(f"Transcoding {i}/{len(saved)} ...")
                         self._video_processor.transcode(file, self._encoder)
 
-                    self._update_status(f"Done: {len(saved)} downloaded")
+                    self._update_status(f"Done: {len(saved)} item downloaded")
             
         except Exception as e:
             if not self._cancel_flag.is_set():

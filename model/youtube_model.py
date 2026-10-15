@@ -1,8 +1,8 @@
 import yt_dlp
 import os
-import sys
 from pathlib import Path
 
+SECTION_INDEX_LIMIT = 500
 _FILE_HOOK_PP = 'MoveFiles'
 
 class YoutubeModel:
@@ -137,13 +137,16 @@ class YoutubeModel:
             for title, slug in self._POSSIBLE_CHANNEL_SECTIONS
         ]
 
-    def get_section_contents(self, section_url: str, limit: int = 8) -> list[dict]:        
+    def get_section_contents(self, section_url: str, limit: int = 8, offset: int = 0) -> list[dict]:
+        start = offset + 1          # yt-dlp counts from 1, not 0
+        end = offset + limit     
+
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
             'skip_download': True,
-            'playlistend': limit,
+            'playlist_items': f"{start}-{end}",
         }
  
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -176,6 +179,35 @@ class YoutubeModel:
                     'url': f"https://www.youtube.com/watch?v={entry_id}",
                 })
  
+        return results
+
+    def get_section_index(self, section_url: str, max_items: int = SECTION_INDEX_LIMIT) -> list[dict]:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+            'skip_download': True,
+            'playlist_items': f"1-{max_items}",
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(section_url, download=False)
+
+        results = []
+        for entry in (info.get('entries') or []):
+            entry_id = entry.get('id')
+            entry_url = entry.get('url')
+            if not entry_id or not entry_url:
+                continue
+
+            is_playlist = 'playlist?list=' in entry_url
+            results.append({
+                'type': 'playlist' if is_playlist else 'video',
+                'id': entry_id,
+                'title': entry.get('title', 'Untitled'),
+                'duration': entry.get('duration'),
+                'url': entry_url if is_playlist else f"https://www.youtube.com/watch?v={entry_id}",
+            })
         return results
 
     ## Private Methods

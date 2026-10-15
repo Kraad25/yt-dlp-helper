@@ -40,6 +40,8 @@ class ExplorerView(BaseView):
         self._status_label = None
         self._context_menu = None
         self._back_button = None
+        self._show_more_button = None
+        self._search_rows_shown = 0
 
         self._thumb_refs = []
         self._render_generation = 0
@@ -48,8 +50,7 @@ class ExplorerView(BaseView):
         self._current_sections: list[dict] = []
         self._current_section_title: str = ""
         self._current_section_url: str = ""
-        self._current_channel_name: str = ""
-        self._current_section_items: list[dict] = []
+        self._current_channel_name: str = ""        
 
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
@@ -77,6 +78,11 @@ class ExplorerView(BaseView):
     def _on_mode_change(self):
         mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
         self._quality_selector.switch_mode(mode)
+
+    def _on_show_more_clicked(self):
+        self._show_more_button.configure(state="disabled")
+        self._update_status("Loading more...")
+        self._explore_controller.show_more_search(self._on_results_ready, self._on_search_error)
 
     def _on_search_clicked(self):
         query = self._search_entry.get().strip()
@@ -106,16 +112,7 @@ class ExplorerView(BaseView):
         self._render_tab_bar(active_title=section["title"])
         self._update_status(f"Loading {section['title']}...")
         self._explore_controller.browse_section(section["url"], self._on_section_items_ready, self._on_browse_error)
-        
-    def _on_result_right_clicked(self, event, item_data: dict):
-        self._context_menu.delete(0, "end")
-        self._context_menu.add_command(
-            label=f"Download: {item_data.get('title', 'this video')}",
-            command=lambda: self._on_download_clicked(item_data),
-        )
-
-        self._context_menu.tk_popup(event.x_root, event.y_root)
-    
+ 
     def _on_item_right_clicked(self, event, item_data: dict):
         self._context_menu.delete(0, "end")
  
@@ -313,7 +310,7 @@ class ExplorerView(BaseView):
         panel = customtkinter.CTkFrame(parent, fg_color=("gray88", "gray19"), corner_radius=10)
         panel.grid(row=self.ROW_RESULTS, column=0, sticky="nsew", padx=30, pady=(0, 10))
         panel.grid_columnconfigure(0, weight=1)
-        panel.grid_rowconfigure(2, weight=1)
+        panel.grid_rowconfigure(3, weight=1)
  
         # Row 0: search bar (+ back button, hidden until browsing a channel)
         search_row = customtkinter.CTkFrame(panel, fg_color="transparent")
@@ -341,10 +338,25 @@ class ExplorerView(BaseView):
         self._tab_bar = customtkinter.CTkFrame(panel, fg_color="transparent")
         self._tab_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(8, 0))
         self._tab_bar.grid_remove()
+
+        # Row 2: "Show more" text link (hidden until there is something to load)
+        self._show_more_button = customtkinter.CTkButton(
+            panel,
+            text="Show more",
+            width=80,
+            height=20,
+            fg_color="transparent",
+            hover=False,
+            text_color=("gray40", "gray60"),
+            font=customtkinter.CTkFont(size=12, underline=True),
+            command=self._on_show_more_clicked,
+        )
+        self._show_more_button.grid(row=2, column=0, sticky="e", padx=14, pady=(4, 0))
+        self._show_more_button.grid_remove()
  
-        # Row 2: results / section items
+        # Row 3: results / section items
         results_frame = customtkinter.CTkScrollableFrame(panel, fg_color="transparent")
-        results_frame.grid(row=2, column=0, sticky="nsew", padx=6, pady=(8, 6))
+        results_frame.grid(row=3, column=0, sticky="nsew", padx=6, pady=(8, 6))
         results_frame.grid_columnconfigure(0, weight=1)
  
         return results_frame, search_entry, back_button
@@ -366,6 +378,9 @@ class ExplorerView(BaseView):
         return menu
     
     def _clear_results(self):
+        self._show_more_button.grid_remove()
+        self._show_more_button.configure(state="normal")
+        self._search_rows_shown = 0
         self._thumb_refs.clear()
         for widget in self._results_frame.winfo_children():
             widget.destroy()
@@ -373,15 +388,24 @@ class ExplorerView(BaseView):
     def _update_status(self, status: str):
         self._status_label.configure(text=status)
     
-    def _on_results_ready(self, results: list):
-        if not results:
+    def _on_results_ready(self, batch: list, has_more: bool):
+        if not batch and self._search_rows_shown == 0:
             self._update_status("No results found")
             return
 
-        self._update_status(f"{len(results)} results")
+        for entry in batch:
+            self._render_item_row(entry, self._search_rows_shown, clickable_channel=True)
+            self._search_rows_shown += 1
 
-        for index, entry in enumerate(results):
-            self._render_item_row(entry, index, clickable_channel=True)
+        self._update_status(f"{self._search_rows_shown} results")
+        self._set_show_more_visible(has_more)
+
+    def _set_show_more_visible(self, visible: bool):
+        self._show_more_button.configure(state="normal")
+        if visible:
+            self._show_more_button.grid()
+        else:
+            self._show_more_button.grid_remove()
 
     def _on_sections_ready(self, sections: list):
         self._current_sections = sections
@@ -389,8 +413,6 @@ class ExplorerView(BaseView):
         self._update_status("Pick a tab to browse" if sections else "No sections found for this channel.")
 
     def _on_section_items_ready(self, items: list):
-        self._current_section_items = items
-
         if not items:
             self._update_status(f"{self._current_section_title}: nothing here yet.")
             return
@@ -399,62 +421,38 @@ class ExplorerView(BaseView):
             self._render_item_row(entry, index, clickable_channel=False)
 
     def _on_watch_channel_confirmed(self, display_name, destination, auto_download, poll_interval):
-        print("watch config:", display_name, destination, auto_download, poll_interval)  # still a placeholder until watcher_controller exists
-
-        # Ask the controller for all the results in this section. Not a few, all.
-        # self._current_section_items = None 
-
-        if not self._current_section_items:
-            return
-
-        BackFillDialog(
-            self,
-            items=self._current_section_items,
-            on_confirm=lambda selected_ids: print("backfill selected:", selected_ids),  # placeholder too
+        print("watch config:", display_name, destination, auto_download, poll_interval)  # placeholder
+        self._update_status("Loading all videos...")
+        self._explore_controller.list_section(
+            self._current_section_url, self._on_section_index_ready, self._on_browse_error
         )
 
+    def _on_section_index_ready(self, items: list, truncated: bool):
+        self.after(0, lambda: self._open_backfill_dialog(items, truncated))
+
+    def _open_backfill_dialog(self, items: list, truncated: bool):
+        if not items:
+            self._update_status("Nothing to back-fill here.")
+            return
+
+        self._update_status(f"Showing first {len(items)}" if truncated else f"{len(items)} videos found")
+        BackFillDialog(
+            self,
+            items=items,
+            on_confirm=self._on_backfill_confirmed,
+        )
+
+    def _on_backfill_confirmed(self, selected: list):
+        print(f"backfill selected: {len(selected)}")  # placeholder until the watcher exists
+        for item in selected:
+            print(" -", item["title"], "|", item["url"])
+
     def _on_search_error(self, error_message: str):
+        self._show_more_button.configure(state="normal")
         self._update_status(f"Search failed: {error_message}")
 
     def _on_browse_error(self, error_message: str):
         self._update_status(f"Couldn't load that: {error_message}")
-    
-    def _render_result_row(self, entry: dict, index: int):
-        row = customtkinter.CTkFrame(self._results_frame, fg_color=("gray85", "gray20"))
-        row.grid(row=index, column=0, sticky="ew", pady=4, padx=2)
-        row.grid_columnconfigure(1, weight=1)
-
-        thumb_label = customtkinter.CTkLabel(row, text="...", width=112, height=63, fg_color=("gray75", "gray25"))
-        thumb_label.grid(row=0, column=0, padx=8, pady=8, sticky="w")
-
-        thumbnail_url = entry.get("thumbnail_url")
-        self._explore_controller.get_thumbnail(
-            thumbnail_url, self, lambda image, lbl=thumb_label: self._apply_thumbnail(lbl, image)
-        )
-
-        text_frame = customtkinter.CTkFrame(row, fg_color="transparent")
-        text_frame.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=8)
-        text_frame.grid_columnconfigure(0, weight=1)
-
-        title = entry.get("title", "Untitled")
-        channel = entry.get("channel", "Unknown channel")
-        duration = entry.get("duration")
-        duration_str = f"{duration // 60}:{duration % 60:02d}" if duration else ""
-
-        customtkinter.CTkLabel(
-            text_frame, text=title, font=customtkinter.CTkFont(size=12, weight="bold"),
-            anchor="w", justify="left", wraplength=280,
-        ).grid(row=0, column=0, sticky="w")
-        
-        channel_label = customtkinter.CTkLabel(
-            text_frame, text=f"{channel}  •  {duration_str}",
-            font=customtkinter.CTkFont(size=11), text_color=("gray40", "gray60"), anchor="w", cursor="hand2",
-        )
-        channel_label.grid(row=1, column=0, sticky="w")
-        channel_label.bind("<Button-1>", lambda e, ch=channel: self._on_channel_clicked(ch))
-
-        for widget in (row, thumb_label, text_frame):
-            widget.bind("<Button-3>", lambda e, data=entry: self._on_result_right_clicked(e, data))
 
     # Tab bar rendering
     def _render_tab_bar(self, active_title: str = None):
