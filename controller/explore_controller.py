@@ -9,6 +9,8 @@ from controller.download_controller import DownloadController
 from service.thumbnail_service import ThumbnailService
 from service.search_page_service import SearchPageService
 
+from concurrent.futures import ThreadPoolExecutor
+
 def _get_app_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
@@ -19,6 +21,7 @@ def _get_ffmpeg_dir(app_root) -> Path:
         return app_root / "_internal" / "ffmpeg"
     return app_root / "ffmpeg"
 
+SECTION_BATCH_SIZE = 20
 
 class ExploreController:
     def __init__(self, download_controller: DownloadController):
@@ -29,6 +32,12 @@ class ExploreController:
         self._search_pager = SearchPageService(fetch=self._youtube_model.search_videos)
         self._thumbnail_service = ThumbnailService()
         self._download_controller = download_controller
+
+        self._section_url = ""
+        self._section_offset = 0
+
+        self._cover_pool = ThreadPoolExecutor(max_workers=6)
+        self._cover_cache: dict[str, str] = {}
 
     # Public Methods
     def search(self, query: str, on_results: Callable, on_error: Callable = None):        
@@ -46,10 +55,12 @@ class ExploreController:
         thread.start()
 
     def browse_section(self, section_url: str, on_ready: Callable, on_error: Callable = None):
-        thread = threading.Thread(
-            target=self._run_browse_section, args=(section_url, on_ready, on_error), daemon=True
-        )
-        thread.start()
+        self._section_url = section_url
+        self._section_offset = 0
+        self._start_section_fetch(on_ready, on_error)
+
+    def show_more_section(self, on_ready: Callable, on_error: Callable = None):
+        self._start_section_fetch(on_ready, on_error)
 
     def get_thumbnail(self, thumbnail_url: str, widget: object, on_ready: Callable):
         self._thumbnail_service.fetch_async(thumbnail_url, widget, on_ready)
@@ -59,6 +70,20 @@ class ExploreController:
             target=self._run_list_section, args=(section_url, on_ready, on_error), daemon=True
         )
         thread.start()
+
+    def get_playlist_cover(self, playlist_url: str, on_ready: Callable):
+        cached = self._cover_cache.get(playlist_url)
+        if cached:
+            on_ready(cached)
+            return
+
+        def task():
+            cover = self._youtube_model.get_playlist_cover(playlist_url)
+            if cover:
+                self._cover_cache[playlist_url] = cover
+            on_ready(cover)
+
+        self._cover_pool.submit(task)
 
     def download(
         self,
@@ -101,6 +126,27 @@ class ExploreController:
             if on_error:
                 on_error(str(e))
 
+    def _start_section_fetch(self, on_ready: Callable, on_error: Callable):
+        thread = threading.Thread(
+            target=self._run_browse_section,
+            args=(self._section_url, self._section_offset, on_ready, on_error),
+            daemon=True,
+        )
+        thread.start()
+
+    def _run_browse_section(self, section_url: str, offset: int, on_ready: Callable, on_error: Callable):
+        try:
+            items = self._youtube_model.get_section_contents(
+                section_url, limit=SECTION_BATCH_SIZE, offset=offset
+            )
+            if section_url != self._section_url:
+                return  # user switched tabs while this was loading
+            self._section_offset = offset + SECTION_BATCH_SIZE
+            on_ready(items, len(items) >= SECTION_BATCH_SIZE)
+        except Exception as e:
+            if on_error:
+                on_error(str(e))
+
     def _run_show_more_search(self, on_results: Callable, on_error: Callable):
         try:
             batch = self._search_pager.next_page()
@@ -113,14 +159,6 @@ class ExploreController:
         try:
             sections = self._youtube_model.get_channel_sections(channel_url)
             on_ready(sections)
-        except Exception as e:
-            if on_error:
-                on_error(str(e))
-
-    def _run_browse_section(self, section_url: str, on_ready: Callable, on_error: Callable):
-        try:
-            items = self._youtube_model.get_section_contents(section_url)
-            on_ready(items)
         except Exception as e:
             if on_error:
                 on_error(str(e))

@@ -41,7 +41,7 @@ class ExplorerView(BaseView):
         self._context_menu = None
         self._back_button = None
         self._show_more_button = None
-        self._search_rows_shown = 0
+        self._rows_shown = 0
 
         self._thumb_refs = []
         self._render_generation = 0
@@ -82,7 +82,10 @@ class ExplorerView(BaseView):
     def _on_show_more_clicked(self):
         self._show_more_button.configure(state="disabled")
         self._update_status("Loading more...")
-        self._explore_controller.show_more_search(self._on_results_ready, self._on_search_error)
+        if self._view_mode == ViewMode.SECTION:
+            self._explore_controller.show_more_section(self._on_section_items_ready, self._on_browse_error)
+        else:
+            self._explore_controller.show_more_search(self._on_results_ready, self._on_search_error)
 
     def _on_search_clicked(self):
         query = self._search_entry.get().strip()
@@ -378,26 +381,28 @@ class ExplorerView(BaseView):
         return menu
     
     def _clear_results(self):
+        self._render_generation += 1
         self._show_more_button.grid_remove()
         self._show_more_button.configure(state="normal")
-        self._search_rows_shown = 0
+        self._rows_shown = 0
         self._thumb_refs.clear()
         for widget in self._results_frame.winfo_children():
             widget.destroy()
+        self._results_frame._parent_canvas.yview_moveto(0)
     
     def _update_status(self, status: str):
         self._status_label.configure(text=status)
     
     def _on_results_ready(self, batch: list, has_more: bool):
-        if not batch and self._search_rows_shown == 0:
+        if not batch and self._rows_shown == 0:
             self._update_status("No results found")
             return
 
         for entry in batch:
-            self._render_item_row(entry, self._search_rows_shown, clickable_channel=True)
-            self._search_rows_shown += 1
+            self._render_item_row(entry, self._rows_shown, clickable_channel=True)
+            self._rows_shown += 1
 
-        self._update_status(f"{self._search_rows_shown} results")
+        self._update_status(f"{self._rows_shown} results")
         self._set_show_more_visible(has_more)
 
     def _set_show_more_visible(self, visible: bool):
@@ -412,13 +417,17 @@ class ExplorerView(BaseView):
         self._render_tab_bar()
         self._update_status("Pick a tab to browse" if sections else "No sections found for this channel.")
 
-    def _on_section_items_ready(self, items: list):
-        if not items:
+    def _on_section_items_ready(self, items: list, has_more: bool):
+        if not items and self._rows_shown == 0:
             self._update_status(f"{self._current_section_title}: nothing here yet.")
             return
-        self._update_status(f"{self._current_section_title}: {len(items)} items")
-        for index, entry in enumerate(items):
-            self._render_item_row(entry, index, clickable_channel=False)
+
+        for entry in items:
+            self._render_item_row(entry, self._rows_shown, clickable_channel=False)
+            self._rows_shown += 1
+
+        self._update_status(f"{self._current_section_title}: {self._rows_shown} items")
+        self._set_show_more_visible(has_more)
 
     def _on_watch_channel_confirmed(self, display_name, destination, auto_download, poll_interval):
         print("watch config:", display_name, destination, auto_download, poll_interval)  # placeholder
@@ -452,6 +461,7 @@ class ExplorerView(BaseView):
         self._update_status(f"Search failed: {error_message}")
 
     def _on_browse_error(self, error_message: str):
+        self._show_more_button.configure(state="normal")
         self._update_status(f"Couldn't load that: {error_message}")
 
     # Tab bar rendering
@@ -483,10 +493,13 @@ class ExplorerView(BaseView):
         thumb_label = customtkinter.CTkLabel(row, text="...", width=112, height=63, fg_color=("gray75", "gray25"))
         thumbnail_url = entry.get("thumbnail_url")
         generation = self._render_generation
-        self._explore_controller.get_thumbnail(
-            thumbnail_url, self,
-            lambda image, lbl=thumb_label, gen=generation: self._apply_thumbnail(lbl, image, gen)
-        )
+        if thumbnail_url or type != "playlist":
+            self._load_thumbnail(thumb_label, thumbnail_url, generation)
+        else:
+            self._explore_controller.get_playlist_cover(
+                entry["url"],
+                lambda cover_url, lbl=thumb_label, gen=generation: self.after(0, lambda: self._load_thumbnail(lbl, cover_url, gen)),
+                )
         thumb_label.grid(row=0, column=0, padx=8, pady=8, sticky="w")
  
         text_frame = customtkinter.CTkFrame(row, fg_color="transparent")
@@ -537,3 +550,10 @@ class ExplorerView(BaseView):
         ctk_image = customtkinter.CTkImage(light_image=image, dark_image=image, size=(112, 63))
         self._thumb_refs.append(ctk_image)
         label.configure(image=ctk_image, text="")
+
+    def _load_thumbnail(self, label, thumbnail_url, generation: int):
+        self._explore_controller.get_thumbnail(
+            thumbnail_url, self,
+            lambda image, lbl=label, gen=generation:
+                self.after(0, lambda: self._apply_thumbnail(lbl, image, gen)),
+        )

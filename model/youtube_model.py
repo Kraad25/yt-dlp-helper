@@ -148,7 +148,7 @@ class YoutubeModel:
             'skip_download': True,
             'playlist_items': f"{start}-{end}",
         }
- 
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(section_url, download=False)
  
@@ -164,7 +164,7 @@ class YoutubeModel:
                     'type': 'playlist',
                     'id': entry_id,
                     'title': entry.get('title', 'Untitled'),
-                    'thumbnail_url': self._get_playlist_cover(entry_url),
+                    'thumbnail_url': None,
                     'url': entry_url,
                 })
             else:
@@ -180,6 +180,12 @@ class YoutubeModel:
                 })
  
         return results
+
+    def get_playlist_cover(self, playlist_url: str) -> str | None:
+        try:
+            return self._get_playlist_cover(playlist_url)
+        except Exception:
+            return None
 
     def get_section_index(self, section_url: str, max_items: int = SECTION_INDEX_LIMIT) -> list[dict]:
         ydl_opts = {
