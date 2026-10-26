@@ -42,6 +42,8 @@ class ExplorerView(BaseView):
         self._back_button = None
         self._show_more_button = None
         self._rows_shown = 0
+        self._search_entries: list[dict] = []
+        self._search_has_more = False
 
         self._thumb_refs = []
         self._render_generation = 0
@@ -92,6 +94,7 @@ class ExplorerView(BaseView):
         if not query:
             return
 
+        self._search_entries.clear()
         self._clear_results()
         self._update_status(f"Searching for '{query}'...")
         self._explore_controller.search(query, self._on_results_ready, self._on_search_error)
@@ -104,7 +107,11 @@ class ExplorerView(BaseView):
         self._current_channel_name = channel_name
         self._clear_results()
         self._set_view_mode(ViewMode.CHANNEL)
-        self._explore_controller.browse_channel(channel_url, self._on_sections_ready, self._on_browse_error)
+        self._explore_controller.browse_channel(
+            channel_url,
+            self._on_main_thread(self._on_sections_ready),
+            self._on_main_thread(self._on_browse_error),
+        )
 
     def _on_section_tab_clicked(self, section: dict):
         self._current_section_title = section["title"]
@@ -182,7 +189,7 @@ class ExplorerView(BaseView):
     def _on_back_clicked(self):
         self._clear_results()
         self._set_view_mode(ViewMode.SEARCH)
-        self._update_status("Type something and hit search")
+        self._restore_search_results()
 
     # Private Methods
     def _setup_style(self):
@@ -402,6 +409,9 @@ class ExplorerView(BaseView):
             self._update_status("No results found")
             return
 
+        self._search_entries.extend(batch)
+        self._search_has_more = has_more
+
         for entry in batch:
             self._render_item_row(entry, self._rows_shown, clickable_channel=True)
             self._rows_shown += 1
@@ -566,3 +576,15 @@ class ExplorerView(BaseView):
         def wrapper(*args):
             self.after(0, lambda: callback(*args))
         return wrapper
+
+    def _restore_search_results(self):
+        if not self._search_entries:
+            self._update_status("Type something and hit search")
+            return
+
+        for entry in self._search_entries:
+            self._render_item_row(entry, self._rows_shown, clickable_channel=True)
+            self._rows_shown += 1
+
+        self._update_status(f"{self._rows_shown} results")
+        self._set_show_more_visible(self._search_has_more)
