@@ -114,7 +114,11 @@ class ExplorerView(BaseView):
         self._set_view_mode(ViewMode.SECTION)
         self._render_tab_bar(active_title=section["title"])
         self._update_status(f"Loading {section['title']}...")
-        self._explore_controller.browse_section(section["url"], self._on_section_items_ready, self._on_browse_error)
+        self._explore_controller.browse_section(
+            section["url"],
+            self._on_main_thread(self._on_section_items_ready),
+            self._on_main_thread(self._on_browse_error),
+        )
  
     def _on_item_right_clicked(self, event, item_data: dict):
         self._context_menu.delete(0, "end")
@@ -557,3 +561,8 @@ class ExplorerView(BaseView):
             lambda image, lbl=label, gen=generation:
                 self.after(0, lambda: self._apply_thumbnail(lbl, image, gen)),
         )
+
+    def _on_main_thread(self, callback: Callable) -> Callable:
+        def wrapper(*args):
+            self.after(0, lambda: callback(*args))
+        return wrapper
