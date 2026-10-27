@@ -99,7 +99,8 @@ class ExplorerView(BaseView):
         query = self._search_entry.get().strip()
         if not query:
             return
-
+        
+        self._explore_controller.stop_section_loading()
         self._search_entries.clear()
         self._clear_results()
         self._update_status(f"Searching for '{query}'...")
@@ -113,7 +114,8 @@ class ExplorerView(BaseView):
         if not channel_url:
             self._update_status("This result has no channel link.")
             return
-
+        
+        self._explore_controller.stop_section_loading()
         self._current_channel_name = channel_name
         self._clear_results()
         self._set_view_mode(ViewMode.CHANNEL)
@@ -197,6 +199,7 @@ class ExplorerView(BaseView):
             self._tab_bar.grid()
  
     def _on_back_clicked(self):
+        self._explore_controller.stop_section_loading()
         self._clear_results()
         self._set_view_mode(ViewMode.SEARCH)
         self._restore_search_results()

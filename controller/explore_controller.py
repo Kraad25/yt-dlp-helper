@@ -35,6 +35,7 @@ class ExploreController:
 
         self._section_url = ""
         self._section_offset = 0
+        self._section_generation = 0
 
         self._cover_pool = ThreadPoolExecutor(max_workers=6)
         self._cover_cache: dict[str, str] = {}
@@ -55,12 +56,16 @@ class ExploreController:
         thread.start()
 
     def browse_section(self, section_url: str, on_ready: Callable, on_error: Callable = None):
+        self._section_generation += 1
         self._section_url = section_url
         self._section_offset = 0
         self._start_section_fetch(on_ready, on_error)
 
     def show_more_section(self, on_ready: Callable, on_error: Callable = None):
         self._start_section_fetch(on_ready, on_error)
+
+    def stop_section_loading(self):
+        self._section_generation += 1
 
     def get_thumbnail(self, thumbnail_url: str, widget: object, on_ready: Callable):
         self._thumbnail_service.fetch_async(thumbnail_url, widget, on_ready)
@@ -129,21 +134,23 @@ class ExploreController:
     def _start_section_fetch(self, on_ready: Callable, on_error: Callable):
         thread = threading.Thread(
             target=self._run_browse_section,
-            args=(self._section_url, self._section_offset, on_ready, on_error),
+            args=(self._section_url, self._section_offset, self._section_generation, on_ready, on_error),
             daemon=True,
         )
         thread.start()
 
-    def _run_browse_section(self, section_url: str, offset: int, on_ready: Callable, on_error: Callable):
+    def _run_browse_section(self, section_url: str, offset: int, generation: int, on_ready: Callable, on_error: Callable):
         try:
             items = self._youtube_model.get_section_contents(
                 section_url, limit=SECTION_BATCH_SIZE, offset=offset
             )
-            if section_url != self._section_url:
-                return  # user switched tabs while this was loading
+            if generation != self._section_generation:
+                return  # stale: the user moved on while this was loading
             self._section_offset = offset + SECTION_BATCH_SIZE
             on_ready(items, len(items) >= SECTION_BATCH_SIZE)
         except Exception as e:
+            if generation != self._section_generation:
+                return
             if on_error:
                 on_error(str(e))
 
