@@ -85,9 +85,15 @@ class ExplorerView(BaseView):
         self._show_more_button.configure(state="disabled")
         self._update_status("Loading more...")
         if self._view_mode == ViewMode.SECTION:
-            self._explore_controller.show_more_section(self._on_section_items_ready, self._on_browse_error)
+            self._explore_controller.show_more_section(
+                self._on_main_thread(self._on_section_items_ready),
+                self._on_main_thread(self._on_browse_error),
+            )
         else:
-            self._explore_controller.show_more_search(self._on_results_ready, self._on_search_error)
+            self._explore_controller.show_more_search(
+                self._on_main_thread(self._on_results_ready),
+                self._on_main_thread(self._on_search_error),
+            )
 
     def _on_search_clicked(self):
         query = self._search_entry.get().strip()
@@ -97,7 +103,11 @@ class ExplorerView(BaseView):
         self._search_entries.clear()
         self._clear_results()
         self._update_status(f"Searching for '{query}'...")
-        self._explore_controller.search(query, self._on_results_ready, self._on_search_error)
+        self._explore_controller.search(
+            query,
+            self._on_main_thread(self._on_results_ready),
+            self._on_main_thread(self._on_search_error),
+        )
 
     def _on_channel_clicked(self, channel_url: str, channel_name: str = ""):
         if not channel_url:
@@ -447,11 +457,13 @@ class ExplorerView(BaseView):
         print("watch config:", display_name, destination, auto_download, poll_interval)  # placeholder
         self._update_status("Loading all videos...")
         self._explore_controller.list_section(
-            self._current_section_url, self._on_section_index_ready, self._on_browse_error
+            self._current_section_url,
+            self._on_main_thread(self._on_section_index_ready),
+            self._on_main_thread(self._on_browse_error),
         )
 
     def _on_section_index_ready(self, items: list, truncated: bool):
-        self.after(0, lambda: self._open_backfill_dialog(items, truncated))
+        self._open_backfill_dialog(items, truncated)
 
     def _open_backfill_dialog(self, items: list, truncated: bool):
         if not items:
