@@ -145,7 +145,7 @@ class ExploreController:
                 section_url, limit=SECTION_BATCH_SIZE, offset=offset
             )
             if generation != self._section_generation:
-                return  # stale: the user moved on while this was loading
+                return  # The user moved on while this was loading
             self._section_offset = offset + SECTION_BATCH_SIZE
             on_ready(items, len(items) >= SECTION_BATCH_SIZE)
         except Exception as e:
