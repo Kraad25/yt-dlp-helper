@@ -104,6 +104,7 @@ class ExplorerView(BaseView):
         if not query:
             return
         
+        self._set_view_mode(ViewMode.SEARCH)
         self._explore_controller.stop_section_loading()
         self._search_entries.clear()
         self._clear_results()
