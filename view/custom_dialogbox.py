@@ -94,6 +94,8 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
         header.grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
 
     def _request_display_name(self, channel_name, section_title):
+        # using grid() returns Nothing, thus display name is set to None. It is fine since we don't use it, its purpose is for readability.
+    
         display_name = customtkinter.CTkLabel(self, text="Name", text_color="gray50").grid(row=1, column=0, sticky="w", padx=20)
         name_entry = customtkinter.CTkEntry(self)
         name_entry.insert(0, f"{channel_name} - {section_title}")
@@ -111,7 +113,8 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
         destination_entry.insert(0, default_destination)
         destination_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
-        browse_button = customtkinter.CTkButton(dest_row, text="📁", width=32, command=self._on_browse).grid(row=0, column=1)
+        browse_button = customtkinter.CTkButton(dest_row, text="📁", width=32, command=self._on_browse)
+        browse_button.grid(row=0, column=1)
 
         return destination_entry, browse_button
 
@@ -143,8 +146,12 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
         btn_row = customtkinter.CTkFrame(self, fg_color="transparent")
         btn_row.grid(row=9, column=0, sticky="ew", padx=20, pady=(10, 20))
         btn_row.grid_columnconfigure((0, 1), weight=1)
-        cancel_button = customtkinter.CTkButton(btn_row, text="Cancel", fg_color="transparent", border_width=1, command=self.destroy).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        next_button = customtkinter.CTkButton(btn_row, text="Next →", command=self._on_submit).grid(row=0, column=1, sticky="ew")
+
+        cancel_button = customtkinter.CTkButton(btn_row, text="Cancel", fg_color="transparent", border_width=1, command=self.destroy)
+        cancel_button.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        next_button = customtkinter.CTkButton(btn_row, text="Next →", command=self._on_submit)
+        next_button.grid(row=0, column=1, sticky="ew")
 
         return cancel_button, next_button
 

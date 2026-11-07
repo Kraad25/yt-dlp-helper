@@ -152,7 +152,8 @@ class HomeView(BaseView):
             self,
             text="Media Downloader",
             font=customtkinter.CTkFont(size=18, weight="bold"),
-        ).grid(row=self.ROW_HEADER, column=0, columnspan=2, pady=(20, 15))
+        )
+        title.grid(row=self.ROW_HEADER, column=0, columnspan=2, pady=(20, 15))
 
         return title
 
