@@ -21,9 +21,12 @@
 *.tcl
 *.enc
 *.msg
+*.dbA
 dist/
 libs/
 python-embed/
+data/
+config/
 
 get-pip.py
 !requirements.txt

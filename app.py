@@ -145,12 +145,12 @@ class App:
                 label=label,
                 variable=self._encoder_var,
                 value=encoder_type,
-                command=lambda: self._on_encoder_selected(info["type"]),
+                command=self._on_encoder_selected,
             )
 
         first_type = encoders[0]["type"]
         self._encoder_var.set(first_type)
-        self._on_encoder_selected(first_type)
+        self._on_encoder_selected()
 
     def _initialize_views(self):
         self._home_view = HomeView(self.root)
@@ -209,9 +209,9 @@ class App:
     def _change_status_for_updates(self, message):
         self._home_view.update_status(message)
 
-    def _on_encoder_selected(self, encoder_type: str = "CPU"):
+    def _on_encoder_selected(self):
+        encoder_type = self._encoder_var.get()
         self._home_view.set_video_encoder(encoder_type)
-
 
 
 if __name__ == "__main__":
