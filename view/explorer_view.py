@@ -52,7 +52,9 @@ class ExplorerView(BaseView):
         self._current_sections: list[dict] = []
         self._current_section_title: str = ""
         self._current_section_url: str = ""
-        self._current_channel_name: str = ""        
+        self._current_channel_name: str = ""
+        self._section_info: dict | None = None
+        self._backfill_item_info: list[dict] = []
 
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
@@ -62,7 +64,9 @@ class ExplorerView(BaseView):
     # Public Methods
     def set_controllers(self, explore_controller: ExploreController, folder_controller: FolderController):
         self._explore_controller = explore_controller
-        self._folder_controller = folder_controller        
+        self._folder_controller = folder_controller
+
+        self._refresh_watchlist()        
 
     def set_base_folder_path(self, path: str):
         if self._destination_entry:
@@ -456,8 +460,15 @@ class ExplorerView(BaseView):
         self._update_status(f"{self._current_section_title}: {self._rows_shown} items")
         self._set_show_more_visible(has_more)
 
-    def _on_watch_channel_confirmed(self, display_name, destination, auto_download, poll_interval):
-        print("watch config:", display_name, destination, auto_download, poll_interval)  # placeholder
+    def _on_watch_channel_confirmed(self, section_name, destination, auto_download, poll_interval):
+        self._section_info = {
+            "section_url": self._current_section_url,
+            "section_name": section_name,
+            "destination_path": destination,
+            "auto_download": auto_download, 
+            "poll_interval": poll_interval if poll_interval else "15"
+        }
+
         self._update_status("Loading all videos...")
         self._explore_controller.list_section(
             self._current_section_url,
@@ -469,10 +480,11 @@ class ExplorerView(BaseView):
         self._open_backfill_dialog(items, truncated)
 
     def _open_backfill_dialog(self, items: list, truncated: bool):
+        self._backfill_item_info = items
         if not items:
             self._update_status("Nothing to back-fill here.")
             return
-
+        
         self._update_status(f"Showing first {len(items)}" if truncated else f"{len(items)} videos found")
         BackFillDialog(
             self,
@@ -481,9 +493,21 @@ class ExplorerView(BaseView):
         )
 
     def _on_backfill_confirmed(self, selected: list):
-        print(f"backfill selected: {len(selected)}")  # placeholder until the watcher exists
-        for item in selected:
-            print(" -", item["title"], "|", item["url"])
+        ticked_ids = {item["id"] for item in selected}
+        for item in self._backfill_item_info:            
+            if item["id"] in ticked_ids:
+                item["status"] = "queued"
+            else:
+                item["status"] = "ignored"
+
+        error = self._explore_controller.save_watch(self._section_info, self._backfill_item_info)
+        self._update_status(error if error else "Added to your watch list")
+        if not error:
+            self._refresh_watchlist()
+
+        # Clear it at the end
+        self._section_info = None
+        self._backfill_item_info = []
 
     def _on_search_error(self, error_message: str):
         self._show_more_button.configure(state="normal")
@@ -603,3 +627,15 @@ class ExplorerView(BaseView):
 
         self._update_status(f"{self._rows_shown} results")
         self._set_show_more_visible(self._search_has_more)
+
+    def _refresh_watchlist(self):
+        self._fill_watchlist(self._active_watchlist_frame, self._explore_controller.get_watches(True))
+        self._fill_watchlist(self._paused_watchlist_frame, self._explore_controller.get_watches(False))
+
+    def _fill_watchlist(self, frame, watches: list[dict]):
+        for widget in frame.winfo_children():
+            widget.destroy()
+        for index, watch in enumerate(watches):
+            customtkinter.CTkLabel(
+                frame, text=watch["section_name"], anchor="w", justify="left", wraplength=160,
+            ).grid(row=index, column=0, sticky="w", padx=6, pady=2)

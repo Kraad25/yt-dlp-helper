@@ -26,7 +26,6 @@ def initilize_database():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS watch_list(
             section_url TEXT PRIMARY KEY NOT NULL,
-            section_id TEXT NOT NULL,
             section_name TEXT NOT NULL,
             destination_path TEXT NOT NULL,
             auto_download BOOLEAN NOT NULL DEFAULT FALSE,

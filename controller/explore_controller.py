@@ -1,13 +1,19 @@
+import os
 import sys
+import sqlite3
 import threading
 from pathlib import Path
 from typing import Callable
 
-from model.youtube_model import YoutubeModel, SECTION_INDEX_LIMIT
 from controller.download_controller import DownloadController
+
+from model.youtube_model import YoutubeModel, SECTION_INDEX_LIMIT
+from model.watcher_db_model import initilize_database
+from model.validators import WatcherValidator
 
 from service.thumbnail_service import ThumbnailService
 from service.search_page_service import SearchPageService
+from service.database_service import add_watch_with_items, is_watching, get_active_or_paused_watch_list
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,10 +34,13 @@ class ExploreController:
         app_root = _get_app_root()
         ffmpeg_dir = _get_ffmpeg_dir(app_root)
 
+        initilize_database()
+
         self._youtube_model = YoutubeModel(ffmpeg_dir)
         self._search_pager = SearchPageService(fetch=self._youtube_model.search_videos)
         self._thumbnail_service = ThumbnailService()
         self._download_controller = download_controller
+        self._validator = WatcherValidator
 
         self._section_url = ""
         self._section_offset = 0
@@ -89,6 +98,9 @@ class ExploreController:
             on_ready(cover)
 
         self._cover_pool.submit(task)
+
+    def get_watches(self, is_active: bool) -> list[dict]:
+        return get_active_or_paused_watch_list(is_active)
 
     def download(
         self,
@@ -169,3 +181,23 @@ class ExploreController:
         except Exception as e:
             if on_error:
                 on_error(str(e))
+
+    def save_watch(self, section_info: dict, items: list[dict]) -> str | None:
+        error = self._validator.validate(section_info)
+        if error:
+            return error
+
+        section_info["poll_interval"] = int(section_info["poll_interval"])
+
+        if is_watching(section_info["section_url"]):
+            return "Already in your watch list"
+
+        try:
+            os.makedirs(section_info["destination_path"], exist_ok=True)
+            add_watch_with_items(section_info, items)
+        except sqlite3.IntegrityError:
+            return "Already in your watch list"
+        except OSError as e:
+            return f"Couldn't create the folder: {e}"
+
+        return None

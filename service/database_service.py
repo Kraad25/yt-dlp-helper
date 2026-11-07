@@ -1,4 +1,5 @@
 from model.watcher_db_model import db_transaction
+from typing import Callable
 
 ITEM_STATUS_NEW = "new"
 ITEM_STATUS_DOWNLOADED = "downloaded"
@@ -7,31 +8,29 @@ ITEM_STATUS_REMOVED_UPSTREAM = "removed_upstream"
 
 # Public Methods
 ## Adders
-def add_item_to_watcher(section_info: dict):
-    with db_transaction() as connection:
-        connection.execute(
-            """
-            INSERT INTO watch_list
-                (section_url, section_id, section_name, destination_path, auto_download, is_active, poll_interval)
-            VALUES (?, ?, ?, ?, ?, 1, ?)
-            """,
-            (_clean_url(section_info["section_url"]), section_info["section_id"], section_info["section_name"],
-             section_info["destination_path"], section_info["auto_download"], section_info["poll_interval"]),
-        )
-
-def add_items(section_url: str, items: list[dict], status: str):
+def add_watch_with_items(section_info: dict, items: list[dict]):
+    section_url = _clean_url(section_info["section_url"])
     rows = [
         (
             item["id"],
             item["title"],
             item["url"],
-            status,
+            item["status"],
             item.get("thumbnail_url"),
-            _clean_url(section_url),
+            section_url,
         )
         for item in items
     ]
     with db_transaction() as connection:
+        connection.execute(
+            """
+            INSERT INTO watch_list
+                (section_url, section_name, destination_path, auto_download, is_active, poll_interval)
+            VALUES (?, ?, ?, ?, 1, ?)
+            """,
+            (section_url, section_info["section_name"], section_info["destination_path"],
+             section_info["auto_download"], section_info["poll_interval"]),
+        )
         connection.executemany(
             """
             INSERT OR IGNORE INTO items
@@ -77,6 +76,14 @@ def get_items_by_section(section_url: str) -> list[dict]:
 
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+
+def is_watching(section_url: str) -> bool:
+    with db_transaction() as connection:
+        row = connection.execute(
+            "SELECT 1 FROM watch_list WHERE section_url = ?",
+            (_clean_url(section_url),),
+        ).fetchone()
+        return row is not None
     
 ## Setters
 def set_watch_active(section_url: str, is_active: bool):
