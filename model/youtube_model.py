@@ -17,6 +17,7 @@ class YoutubeModel:
         ("Playlists", "playlists"),
     ]
 
+    # Public Methods
     def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None):
         quality_value = quality.split()[0]  # "192 kbps" -> "192"
         downloaded_files = []
@@ -113,6 +114,7 @@ class YoutubeModel:
             })
         return results
 
+    ## Getters
     def get_url_info(self, url: str) -> dict:
         ydl_opts = {
             'quiet': True,

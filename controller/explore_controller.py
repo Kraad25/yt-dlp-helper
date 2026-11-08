@@ -39,12 +39,13 @@ class ExploreController:
         self._youtube_model = YoutubeModel(ffmpeg_dir)
         self._search_pager = SearchPageService(fetch=self._youtube_model.search_videos)
         self._thumbnail_service = ThumbnailService()
+        self._validator = WatcherValidator()
         self._download_controller = download_controller
-        self._validator = WatcherValidator
 
         self._section_url = ""
         self._section_offset = 0
         self._section_generation = 0
+        self._encoder = "CPU"
 
         self._cover_pool = ThreadPoolExecutor(max_workers=6)
         self._cover_cache: dict[str, str] = {}
@@ -108,17 +109,17 @@ class ExploreController:
         mode: str,
         quality: str,
         path: str,
+        encoder: str,
         update_status: Callable,
         enable_download: Callable = lambda enabled: None,
         enable_cancel: Callable = lambda enabled: None,
         update_progress: Callable = lambda value: None,
     ):
         data = {"url": url, "mode": mode, "quality": quality}
-        # Explore results don't have their own encoder picker (yet)
         self._download_controller.download_requested(
             data,
             path,
-            "CPU",
+            encoder,
             enable_download,
             enable_cancel,
             update_progress,

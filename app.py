@@ -45,6 +45,7 @@ class App:
 
         self._home_view: HomeView = None
         self._explorer_view: ExplorerView = None
+        self._current_view: HomeView | ExplorerView = None
 
         self._download_controller: DownloadController = None
         self._explore_controller: ExploreController = None
@@ -123,6 +124,41 @@ class App:
         )
         self.root.configure(menu=menubar)
 
+    def _initialize_views(self):
+        self._home_view = HomeView(self.root)
+        self._home_view.grid(row=0, column=0, sticky="nsew")
+
+        self._explorer_view = ExplorerView(self.root)
+        self._explorer_view.grid(row=0, column=0, sticky="nsew")
+
+    def _initialize_controllers(self):
+        self._download_controller = DownloadController()
+        self._folder_controller = FolderController(MANUAL_DOWNLOAD_DIR_KEY, self._home_view.set_base_folder_path)
+        self._explore_folder_controller = FolderController(EXPLORE_DOWNLOAD_DIR_KEY, self._explorer_view.set_base_folder_path)
+        self._explore_controller = ExploreController(self._download_controller)
+
+    def _wire_controllers_to_views(self):
+        self._home_view.set_controllers(
+            download_controller=self._download_controller,
+            folder_controller=self._folder_controller,
+        )
+        self._explorer_view.set_controllers(
+            explore_controller=self._explore_controller,
+            folder_controller=self._explore_folder_controller,
+        )
+                
+        self._home_view.set_cancel_callback(self._download_controller.cancel_download)
+
+    # Views
+    def _show_home(self):
+        self._current_view = self._home_view
+        self._home_view.tkraise()
+
+    def _show_explore(self):
+        self._current_view = self._explorer_view
+        self._explorer_view.tkraise()
+
+    # Encoder Selection
     def _on_encoders_detected(self, encoders: list):
         self._available_encoders = encoders
 
@@ -151,38 +187,27 @@ class App:
         first_type = encoders[0]["type"]
         self._encoder_var.set(first_type)
         self._on_encoder_selected()
+    
+    def _on_encoder_selected(self):
+        encoder_type = self._encoder_var.get()
+        self._home_view.set_video_encoder(encoder_type)
+        self._explorer_view.set_video_encoder(encoder_type)
 
-    def _initialize_views(self):
-        self._home_view = HomeView(self.root)
-        self._home_view.grid(row=0, column=0, sticky="nsew")
+    # Update yt-dlp & ffmpeg
+    def _check_for_updates(self):
+        if self._current_view == self._home_view:
+            self._home_view.update_status("Checking and Updating")
+        else:
+            self._explorer_view.update_status("Checking and Updating")
+        self._update_service.update_program(update_status = self._change_status_for_updates)
 
-        self._explorer_view = ExplorerView(self.root)
-        self._explorer_view.grid(row=0, column=0, sticky="nsew")
+    def _change_status_for_updates(self, message):
+        if self._current_view == self._home_view:
+            self._home_view.update_status(message)
+        else:
+            self._explorer_view.update_status(message)
 
-    def _initialize_controllers(self):
-        self._download_controller = DownloadController()
-        self._folder_controller = FolderController(MANUAL_DOWNLOAD_DIR_KEY, self._home_view.set_base_folder_path)
-        self._explore_folder_controller = FolderController(EXPLORE_DOWNLOAD_DIR_KEY, self._explorer_view.set_base_folder_path)
-        self._explore_controller = ExploreController(self._download_controller)
-
-    def _wire_controllers_to_views(self):
-        self._home_view.set_controllers(
-            download_controller=self._download_controller,
-            folder_controller=self._folder_controller,
-        )
-        self._explorer_view.set_controllers(
-            explore_controller=self._explore_controller,
-            folder_controller=self._explore_folder_controller,
-        )
-                
-        self._home_view.set_cancel_callback(self._download_controller.cancel_download)
-
-    def _show_home(self):
-        self._home_view.tkraise()
-
-    def _show_explore(self):
-        self._explorer_view.tkraise()
-
+    # About Section
     def _show_about(self):
         yt_dlp_version = ""
         ffmpeg_version = ""
@@ -201,17 +226,6 @@ class App:
             f"yt-dlp version {yt_dlp_version}\n"
             f"ffmpeg version {ffmpeg_version}"
         )
-
-    def _check_for_updates(self):        
-        self._home_view.update_status("Checking and Updating")
-        self._update_service.update_program(update_status = self._change_status_for_updates)
-
-    def _change_status_for_updates(self, message):
-        self._home_view.update_status(message)
-
-    def _on_encoder_selected(self):
-        encoder_type = self._encoder_var.get()
-        self._home_view.set_video_encoder(encoder_type)
 
 
 if __name__ == "__main__":

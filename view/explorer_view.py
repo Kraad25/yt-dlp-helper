@@ -21,6 +21,7 @@ class ViewMode:
 
 class ExplorerView(BaseView):
 
+    # Grid layout rows
     ROW_HEADER = 0
     ROW_DEST_LABEL = 1
     ROW_DEST_ROW = 2
@@ -44,6 +45,7 @@ class ExplorerView(BaseView):
         self._rows_shown = 0
         self._search_entries: list[dict] = []
         self._search_has_more = False
+        self._video_encoder: str = "CPU"
 
         self._thumb_refs = []
         self._render_generation = 0
@@ -73,6 +75,13 @@ class ExplorerView(BaseView):
             self._destination_entry.delete(0, "end")
             self._destination_entry.insert(0, path)
 
+    def set_video_encoder(self, encoder: str):
+        self._video_encoder = encoder
+
+    def update_status(self, status: str):
+        if self._status_label:
+            self._status_label.configure(text=status)
+
     # Event Handlers
     def _on_browse_clicked(self):
         self._folder_controller.browse_folder()
@@ -81,13 +90,9 @@ class ExplorerView(BaseView):
         self._mode_var.set(Mode.MP3 if "Mp3" in value else Mode.MP4)
         self._on_mode_change()
 
-    def _on_mode_change(self):
-        mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
-        self._quality_selector.switch_mode(mode)
-
     def _on_show_more_clicked(self):
         self._show_more_button.configure(state="disabled")
-        self._update_status("Loading more...")
+        self.update_status("Loading more...")
         if self._view_mode == ViewMode.SECTION:
             self._explore_controller.show_more_section(
                 self._on_main_thread(self._on_section_items_ready),
@@ -108,7 +113,7 @@ class ExplorerView(BaseView):
         self._explore_controller.stop_section_loading()
         self._search_entries.clear()
         self._clear_results()
-        self._update_status(f"Searching for '{query}'...")
+        self.update_status(f"Searching for '{query}'...")
         self._explore_controller.search(
             query,
             self._on_main_thread(self._on_results_ready),
@@ -117,7 +122,7 @@ class ExplorerView(BaseView):
 
     def _on_channel_clicked(self, channel_url: str, channel_name: str = ""):
         if not channel_url:
-            self._update_status("This result has no channel link.")
+            self.update_status("This result has no channel link.")
             return
         
         self._explore_controller.stop_section_loading()
@@ -137,7 +142,7 @@ class ExplorerView(BaseView):
         self._clear_results()
         self._set_view_mode(ViewMode.SECTION)
         self._render_tab_bar(active_title=section["title"])
-        self._update_status(f"Loading {section['title']}...")
+        self.update_status(f"Loading {section['title']}...")
         self._explore_controller.browse_section(
             section["url"],
             self._on_main_thread(self._on_section_items_ready),
@@ -168,30 +173,31 @@ class ExplorerView(BaseView):
         base_path = self._destination_entry.get().strip()
 
         if not base_path:
-            self._update_status("Set a destination folder first.")
+            self.update_status("Set a destination folder first.")
             return
 
         mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
         quality = self._quality_selector.get_value()
         url = item_data.get("url")
         title = item_data.get("title", "this video")
+        encoder = self._video_encoder
 
-        self._update_status(f"Downloading: {title}")
+        self.update_status(f"Downloading: {title}")
         self._explore_controller.download(
-            url, mode, quality, base_path,
-            update_status=self._update_status,
+            url, mode, quality, base_path, encoder,
+            update_status=self.update_status,
         )
 
     def _on_add_section_to_watchlist(self):
         base_folder = self._destination_entry.get().strip()
         default_destination = self._folder_controller.normalize_path(os.path.join(base_folder, self._current_channel_name))
         AddWatchChannelDialog(
-        self,
-        channel_name=self._current_channel_name,
-        section_title=self._current_section_title,
-        default_destination=default_destination,
-        on_confirm=self._on_watch_channel_confirmed,
-    )
+            self,
+            channel_name=self._current_channel_name,
+            section_title=self._current_section_title,
+            default_destination=default_destination,
+            on_confirm=self._on_watch_channel_confirmed,
+        )
 
     # Navigation
     def _set_view_mode(self, mode: str):
@@ -408,117 +414,51 @@ class ExplorerView(BaseView):
         import tkinter as tk
         menu = tk.Menu(parent, tearoff=0)
         return menu
-    
-    def _clear_results(self):
-        self._render_generation += 1
-        self._show_more_button.grid_remove()
-        self._show_more_button.configure(state="normal")
-        self._rows_shown = 0
-        self._thumb_refs.clear()
-        for widget in self._results_frame.winfo_children():
-            widget.destroy()
-        self._results_frame._parent_canvas.yview_moveto(0)
-    
-    def _update_status(self, status: str):
-        self._status_label.configure(text=status)
-    
-    def _on_results_ready(self, batch: list, has_more: bool):
-        if not batch and self._rows_shown == 0:
-            self._update_status("No results found")
-            return
 
-        self._search_entries.extend(batch)
-        self._search_has_more = has_more
 
-        for entry in batch:
-            self._render_item_row(entry, self._rows_shown, clickable_channel=True)
-            self._rows_shown += 1
-
-        self._update_status(f"{self._rows_shown} results")
-        self._set_show_more_visible(has_more)
-
-    def _set_show_more_visible(self, visible: bool):
-        self._show_more_button.configure(state="normal")
-        if visible:
-            self._show_more_button.grid()
-        else:
-            self._show_more_button.grid_remove()
-
-    def _on_sections_ready(self, sections: list):
-        self._current_sections = sections
-        self._render_tab_bar()
-        self._update_status("Pick a tab to browse" if sections else "No sections found for this channel.")
-
-    def _on_section_items_ready(self, items: list, has_more: bool):
-        if not items and self._rows_shown == 0:
-            self._update_status(f"{self._current_section_title}: nothing here yet.")
-            return
-
-        for entry in items:
-            self._render_item_row(entry, self._rows_shown, clickable_channel=False)
-            self._rows_shown += 1
-
-        self._update_status(f"{self._current_section_title}: {self._rows_shown} items")
-        self._set_show_more_visible(has_more)
-
-    def _on_watch_channel_confirmed(self, section_name, destination, auto_download, poll_interval):
-        self._section_info = {
-            "section_url": self._current_section_url,
-            "section_name": section_name,
-            "destination_path": destination,
-            "auto_download": auto_download, 
-            "poll_interval": poll_interval if poll_interval else "15"
-        }
-
-        self._update_status("Loading all videos...")
-        self._explore_controller.list_section(
-            self._current_section_url,
-            self._on_main_thread(self._on_section_index_ready),
-            self._on_main_thread(self._on_browse_error),
-        )
-
-    def _on_section_index_ready(self, items: list, truncated: bool):
-        self._open_backfill_dialog(items, truncated)
-
-    def _open_backfill_dialog(self, items: list, truncated: bool):
-        self._backfill_item_info = items
-        if not items:
-            self._update_status("Nothing to back-fill here.")
-            return
-        
-        self._update_status(f"Showing first {len(items)}" if truncated else f"{len(items)} videos found")
-        BackFillDialog(
-            self,
-            items=items,
-            on_confirm=self._on_backfill_confirmed,
-        )
-
-    def _on_backfill_confirmed(self, selected: list):
-        ticked_ids = {item["id"] for item in selected}
-        for item in self._backfill_item_info:            
-            if item["id"] in ticked_ids:
-                item["status"] = "queued"
-            else:
-                item["status"] = "ignored"
-
-        error = self._explore_controller.save_watch(self._section_info, self._backfill_item_info)
-        self._update_status(error if error else "Added to your watch list")
-        if not error:
-            self._refresh_watchlist()
-
-        # Clear it at the end
-        self._section_info = None
-        self._backfill_item_info = []
+    ## Helper Functions
+    def _on_mode_change(self):
+        mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
+        self._quality_selector.switch_mode(mode)
 
     def _on_search_error(self, error_message: str):
         self._show_more_button.configure(state="normal")
-        self._update_status(f"Search failed: {error_message}")
+        self.update_status(f"Search failed: {error_message}")
 
     def _on_browse_error(self, error_message: str):
         self._show_more_button.configure(state="normal")
-        self._update_status(f"Couldn't load that: {error_message}")
+        self.update_status(f"Couldn't load that: {error_message}")
 
-    # Tab bar rendering
+    def _on_main_thread(self, callback: Callable) -> Callable:
+        def wrapper(*args):
+            self.after(0, lambda: callback(*args))
+        return wrapper
+
+    ### Thumbnail rendering functions
+    def _apply_thumbnail(self, label, image, generation: int):
+        if generation != self._render_generation:
+            return
+        try:
+            if not label.winfo_exists():
+                return
+        except Exception:
+            return
+ 
+        if image is None:
+            label.configure(text="No\nImage")
+            return
+        ctk_image = customtkinter.CTkImage(light_image=image, dark_image=image, size=(112, 63))
+        self._thumb_refs.append(ctk_image)
+        label.configure(image=ctk_image, text="")
+
+    def _load_thumbnail(self, label, thumbnail_url, generation: int):
+        self._explore_controller.get_thumbnail(
+            thumbnail_url, self,
+            lambda image, lbl=label, gen=generation:
+                self.after(0, lambda: self._apply_thumbnail(lbl, image, gen)),
+        )
+
+    ### Results Rendering Functions
     def _render_tab_bar(self, active_title: str = None):
         for widget in self._tab_bar.winfo_children():
             widget.destroy()
@@ -589,46 +529,36 @@ class ExplorerView(BaseView):
         for widget in (row, thumb_label, text_frame):
             widget.bind("<Button-3>", lambda e, data=entry: self._on_item_right_clicked(e, data))
 
-    def _apply_thumbnail(self, label, image, generation: int):
-        if generation != self._render_generation:
-            return
-        try:
-            if not label.winfo_exists():
-                return
-        except Exception:
-            return
- 
-        if image is None:
-            label.configure(text="No\nImage")
-            return
-        ctk_image = customtkinter.CTkImage(light_image=image, dark_image=image, size=(112, 63))
-        self._thumb_refs.append(ctk_image)
-        label.configure(image=ctk_image, text="")
-
-    def _load_thumbnail(self, label, thumbnail_url, generation: int):
-        self._explore_controller.get_thumbnail(
-            thumbnail_url, self,
-            lambda image, lbl=label, gen=generation:
-                self.after(0, lambda: self._apply_thumbnail(lbl, image, gen)),
-        )
-
-    def _on_main_thread(self, callback: Callable) -> Callable:
-        def wrapper(*args):
-            self.after(0, lambda: callback(*args))
-        return wrapper
+    def _clear_results(self):
+        self._render_generation += 1
+        self._show_more_button.grid_remove()
+        self._show_more_button.configure(state="normal")
+        self._rows_shown = 0
+        self._thumb_refs.clear()
+        for widget in self._results_frame.winfo_children():
+            widget.destroy()
+        self._results_frame._parent_canvas.yview_moveto(0)
 
     def _restore_search_results(self):
         if not self._search_entries:
-            self._update_status("Type something and hit search")
+            self.update_status("Type something and hit search")
             return
 
         for entry in self._search_entries:
             self._render_item_row(entry, self._rows_shown, clickable_channel=True)
             self._rows_shown += 1
 
-        self._update_status(f"{self._rows_shown} results")
+        self.update_status(f"{self._rows_shown} results")
         self._set_show_more_visible(self._search_has_more)
 
+    def _set_show_more_visible(self, visible: bool):
+        self._show_more_button.configure(state="normal")
+        if visible:
+            self._show_more_button.grid()
+        else:
+            self._show_more_button.grid_remove()
+            
+    ### Watch list rendering functions
     def _refresh_watchlist(self):
         self._fill_watchlist(self._active_watchlist_frame, self._explore_controller.get_watches(True))
         self._fill_watchlist(self._paused_watchlist_frame, self._explore_controller.get_watches(False))
@@ -640,3 +570,87 @@ class ExplorerView(BaseView):
             customtkinter.CTkLabel(
                 frame, text=watch["section_name"], anchor="w", justify="left", wraplength=160,
             ).grid(row=index, column=0, sticky="w", padx=6, pady=2)
+
+    ### Search event completion handlers
+    def _on_results_ready(self, batch: list, has_more: bool):
+        if not batch and self._rows_shown == 0:
+            self.update_status("No results found")
+            return
+
+        self._search_entries.extend(batch)
+        self._search_has_more = has_more
+
+        for entry in batch:
+            self._render_item_row(entry, self._rows_shown, clickable_channel=True)
+            self._rows_shown += 1
+
+        self.update_status(f"{self._rows_shown} results")
+        self._set_show_more_visible(has_more)    
+
+    def _on_sections_ready(self, sections: list):
+        self._current_sections = sections
+        self._render_tab_bar()
+        self.update_status("Pick a tab to browse" if sections else "No sections found for this channel.")
+
+    def _on_section_items_ready(self, items: list, has_more: bool):
+        if not items and self._rows_shown == 0:
+            self.update_status(f"{self._current_section_title}: nothing here yet.")
+            return
+
+        for entry in items:
+            self._render_item_row(entry, self._rows_shown, clickable_channel=False)
+            self._rows_shown += 1
+
+        self.update_status(f"{self._current_section_title}: {self._rows_shown} items")
+        self._set_show_more_visible(has_more)
+
+    def _on_section_index_ready(self, items: list, truncated: bool):
+        self._open_backfill_dialog(items, truncated)
+
+    ### Section and Backfill event handlers
+    def _open_backfill_dialog(self, items: list, truncated: bool):
+        self._backfill_item_info = items
+        if not items:
+            self.update_status("Nothing to back-fill here.")
+            return
+        
+        self.update_status(f"Showing first {len(items)}" if truncated else f"{len(items)} videos found")
+        BackFillDialog(
+            self,
+            items=items,
+            on_confirm=self._on_backfill_confirmed,
+        )
+
+    def _on_watch_channel_confirmed(self, section_name, destination, auto_download, poll_interval):
+        self._section_info = {
+            "section_url": self._current_section_url,
+            "section_name": section_name,
+            "destination_path": destination,
+            "auto_download": auto_download, 
+            "poll_interval": poll_interval if poll_interval else "15"
+        }
+
+        self.update_status("Loading all videos...")
+        self._explore_controller.list_section(
+            self._current_section_url,
+            self._on_main_thread(self._on_section_index_ready),
+            self._on_main_thread(self._on_browse_error),
+        )
+
+    def _on_backfill_confirmed(self, selected: list):
+        ticked_ids = {item["id"] for item in selected}
+        for item in self._backfill_item_info:            
+            if item["id"] in ticked_ids:
+                item["status"] = "queued"
+            else:
+                item["status"] = "ignored"
+
+        error = self._explore_controller.save_watch(self._section_info, self._backfill_item_info)
+        self.update_status(error if error else "Added to your watch list")
+        if not error:
+            self._refresh_watchlist()
+
+        # Clear it at the end
+        self._section_info = None
+        self._backfill_item_info = []
+            

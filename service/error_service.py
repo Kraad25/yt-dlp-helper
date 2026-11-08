@@ -5,17 +5,11 @@ class ErrorHandlingService:
             "is not a valid url": "Invalid URL format",
             "video unavailable": "Video is unavailable",
             "private": "Video is private",
-            "age": "Video is age-restricted",
             "geo": "Video is not available in your region",
             "403": "Access denied (403)",
             "404": "Video not found (404)",
             "no formats": "No video formats available",
-            
-            # FFmpeg/Transcoding errors
-            "ffmpeg": "FFmpeg error - check installation",
-            "probe failed": "Cannot read video file",
-            "transcoding failed": "Failed to process video",
-            "codec": "Unsupported video codec",
+            "age-restricted": "Video is age-restricted",
             
             # File/System errors
             "permission denied": "Permission denied - check folder access",
@@ -23,6 +17,12 @@ class ErrorHandlingService:
             "disk full": "Not enough disk space",
             "file not found": "File not found - may have been moved",
             "read-only": "Folder is read-only",
+
+            # FFmpeg/Transcoding errors
+            "probe failed": "Cannot read video file",
+            "transcoding failed": "Failed to process video",
+            "codec": "Unsupported video codec",
+            "ffmpeg": "FFmpeg error - check installation",
         }
 
     def handle_error(self, update_status, error: Exception=None, custom_msg: str=None):

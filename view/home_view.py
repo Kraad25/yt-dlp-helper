@@ -14,6 +14,7 @@ class Mode:
 
 class HomeView(BaseView):
 
+    # Grid layout rows
     ROW_HEADER = 0
     ROW_URL_LABEL = 1
     ROW_URL_ENTRY = 2
@@ -164,7 +165,7 @@ class HomeView(BaseView):
         url_entry = customtkinter.CTkEntry(self, placeholder_text="Paste a supported URL")
         url_entry.grid(row=self.ROW_URL_ENTRY, column=0, columnspan=2, sticky="ew", padx=30, pady=(2, 15))
 
-        self.attach_entry_context_menu(url_entry) # enables right click option for cut, copy, paste and select all
+        self._attach_entry_context_menu(url_entry) # enables right click option for cut, copy, paste and select all
         url_entry.bind("<Return>", lambda event: self._on_download_clicked())
 
         return url_entry
@@ -259,7 +260,7 @@ class HomeView(BaseView):
 
         return download_button, cancel_button
 
-    def attach_entry_context_menu(self, entry: customtkinter.CTkEntry):
+    def _attach_entry_context_menu(self, entry: customtkinter.CTkEntry):
         inner = entry._entry  # the tk.Entry inside the CTkEntry
         menu = tk.Menu(inner, tearoff=0)
 

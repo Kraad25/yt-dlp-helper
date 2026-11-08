@@ -5,6 +5,7 @@ from pathlib import Path
 
 si = subprocess.STARTUPINFO()
 si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
 class VideoProcessingService:
     def __init__(self, ffmpeg_dir: Path, encoder: str = 'QSV'):   
         self._ffmpeg_dir = ffmpeg_dir
