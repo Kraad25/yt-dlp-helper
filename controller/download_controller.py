@@ -126,7 +126,7 @@ class DownloadController:
             if not self._cancel_flag.is_set():
                 saved = [file for file in downloaded_files if os.path.exists(file)]
                 if saved:
-                    self._update_status("Done")
+                    self._update_status(f"Done: {len(saved)} item downloaded")
                 else:
                     self._update_status("Download failed, nothing was saved")
 

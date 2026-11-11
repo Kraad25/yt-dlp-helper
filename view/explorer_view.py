@@ -60,6 +60,7 @@ class ExplorerView(BaseView):
 
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
+        self._thread_dispatcher = None
 
         super().__init__(parent)
 
@@ -74,6 +75,9 @@ class ExplorerView(BaseView):
         if self._destination_entry:
             self._destination_entry.delete(0, "end")
             self._destination_entry.insert(0, path)
+
+    def set_thread_dispatcher(self, dispatcher):
+        self._thread_dispatcher = dispatcher
 
     def set_video_encoder(self, encoder: str):
         self._video_encoder = encoder
@@ -95,13 +99,13 @@ class ExplorerView(BaseView):
         self.update_status("Loading more...")
         if self._view_mode == ViewMode.SECTION:
             self._explore_controller.show_more_section(
-                self._on_main_thread(self._on_section_items_ready),
-                self._on_main_thread(self._on_browse_error),
+                self._thread_dispatcher.wrap(self._on_section_items_ready),
+                self._thread_dispatcher.wrap(self._on_browse_error),
             )
         else:
             self._explore_controller.show_more_search(
-                self._on_main_thread(self._on_results_ready),
-                self._on_main_thread(self._on_search_error),
+                self._thread_dispatcher.wrap(self._on_results_ready),
+                self._thread_dispatcher.wrap(self._on_search_error),
             )
 
     def _on_search_clicked(self):
@@ -116,8 +120,8 @@ class ExplorerView(BaseView):
         self.update_status(f"Searching for '{query}'...")
         self._explore_controller.search(
             query,
-            self._on_main_thread(self._on_results_ready),
-            self._on_main_thread(self._on_search_error),
+            self._thread_dispatcher.wrap(self._on_results_ready),
+            self._thread_dispatcher.wrap(self._on_search_error),
         )
 
     def _on_channel_clicked(self, channel_url: str, channel_name: str = ""):
@@ -131,8 +135,8 @@ class ExplorerView(BaseView):
         self._set_view_mode(ViewMode.CHANNEL)
         self._explore_controller.browse_channel(
             channel_url,
-            self._on_main_thread(self._on_sections_ready),
-            self._on_main_thread(self._on_browse_error),
+            self._thread_dispatcher.wrap(self._on_sections_ready),
+            self._thread_dispatcher.wrap(self._on_browse_error),
         )
 
     def _on_section_tab_clicked(self, section: dict):
@@ -145,8 +149,8 @@ class ExplorerView(BaseView):
         self.update_status(f"Loading {section['title']}...")
         self._explore_controller.browse_section(
             section["url"],
-            self._on_main_thread(self._on_section_items_ready),
-            self._on_main_thread(self._on_browse_error),
+            self._thread_dispatcher.wrap(self._on_section_items_ready),
+            self._thread_dispatcher.wrap(self._on_browse_error),
         )
  
     def _on_item_right_clicked(self, event, item_data: dict):
@@ -185,7 +189,7 @@ class ExplorerView(BaseView):
         self.update_status(f"Downloading: {title}")
         self._explore_controller.download(
             url, mode, quality, base_path, encoder,
-            update_status=self.update_status,
+            update_status=self._thread_dispatcher.wrap(self.update_status),
         )
 
     def _on_add_section_to_watchlist(self):
@@ -429,11 +433,6 @@ class ExplorerView(BaseView):
         self._show_more_button.configure(state="normal")
         self.update_status(f"Couldn't load that: {error_message}")
 
-    def _on_main_thread(self, callback: Callable) -> Callable:
-        def wrapper(*args):
-            self.after(0, lambda: callback(*args))
-        return wrapper
-
     ### Thumbnail rendering functions
     def _apply_thumbnail(self, label, image, generation: int):
         if generation != self._render_generation:
@@ -455,7 +454,7 @@ class ExplorerView(BaseView):
         self._explore_controller.get_thumbnail(
             thumbnail_url, self,
             lambda image, lbl=label, gen=generation:
-                self.after(0, lambda: self._apply_thumbnail(lbl, image, gen)),
+                self._thread_dispatcher.post(self._apply_thumbnail, lbl, image, gen),
         )
 
     ### Results Rendering Functions
@@ -492,7 +491,7 @@ class ExplorerView(BaseView):
         else:
             self._explore_controller.get_playlist_cover(
                 entry["url"],
-                lambda cover_url, lbl=thumb_label, gen=generation: self.after(0, lambda: self._load_thumbnail(lbl, cover_url, gen)),
+                lambda cover_url, lbl=thumb_label, gen=generation:  self._thread_dispatcher.post(self._load_thumbnail, lbl, cover_url, gen),
                 )
         thumb_label.grid(row=0, column=0, padx=8, pady=8, sticky="w")
  
@@ -633,8 +632,8 @@ class ExplorerView(BaseView):
         self.update_status("Loading all videos...")
         self._explore_controller.list_section(
             self._current_section_url,
-            self._on_main_thread(self._on_section_index_ready),
-            self._on_main_thread(self._on_browse_error),
+            self._thread_dispatcher.wrap(self._on_section_index_ready),
+            self._thread_dispatcher.wrap(self._on_browse_error),
         )
 
     def _on_backfill_confirmed(self, selected: list):

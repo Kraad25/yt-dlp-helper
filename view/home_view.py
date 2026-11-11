@@ -42,6 +42,7 @@ class HomeView(BaseView):
 
         self._on_cancel: Callable = None
         self._video_encoder: str = "CPU"
+        self._thread_dispatcher = None
 
         super().__init__(parent)
 
@@ -49,6 +50,9 @@ class HomeView(BaseView):
     def set_controllers(self, download_controller, folder_controller):
         self._download_controller = download_controller
         self._folder_controller = folder_controller
+
+    def set_thread_dispatcher(self, dispatcher):
+        self._thread_dispatcher = dispatcher
 
     def set_cancel_callback(self, callback: Callable):
         self._on_cancel = callback
@@ -93,10 +97,10 @@ class HomeView(BaseView):
             data,
             path,
             self._video_encoder,
-            self.set_download_enabled,
-            self.set_cancel_enabled,
-            self.update_progress,
-            self.update_status
+            self._thread_dispatcher.wrap(self.set_download_enabled),
+            self._thread_dispatcher.wrap(self.set_cancel_enabled),
+            self._thread_dispatcher.wrap(self.update_progress),
+            self._thread_dispatcher.wrap(self.update_status),
         )
 
     def _on_browse_clicked(self):

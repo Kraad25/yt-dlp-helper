@@ -43,9 +43,9 @@ class ThumbnailService:
                 self._save_to_cache(url, image)
 
             image = image.resize((self._width, self._height))
-            widget.after(0, lambda: on_ready(image))
+            on_ready(image)
         except Exception:
-            widget.after(0, lambda: on_ready(None))
+            on_ready(image)
 
     def _cache_path(self, url: str) -> Path:
         key = hashlib.sha256(url.encode("utf-8")).hexdigest()

@@ -15,6 +15,8 @@ import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
 
+from core.ui_thread_dispatcher import UiThreadDispatcher
+
 from view.theme import AppTheme
 from view.home_view import HomeView
 from view.explorer_view import ExplorerView
@@ -42,10 +44,12 @@ class App:
         AppTheme.apply_global_theme()
 
         self.root = ctk.CTk()
+        self._thread_dispatcher: UiThreadDispatcher = UiThreadDispatcher(self.root)
 
         self._home_view: HomeView = None
         self._explorer_view: ExplorerView = None
         self._current_view: HomeView | ExplorerView = None
+
 
         self._download_controller: DownloadController = None
         self._explore_controller: ExploreController = None
@@ -71,7 +75,7 @@ class App:
         self._show_home()
 
         tester = EncoderTestService()
-        tester.list_available_encoder(self._on_encoders_detected)
+        tester.list_available_encoder(self._thread_dispatcher.wrap(self._on_encoders_detected))
 
         self._update_service = UpdateService()
         
@@ -131,6 +135,9 @@ class App:
         self._explorer_view = ExplorerView(self.root)
         self._explorer_view.grid(row=0, column=0, sticky="nsew")
 
+        self._home_view.set_thread_dispatcher(self._thread_dispatcher)
+        self._explorer_view.set_thread_dispatcher(self._thread_dispatcher)
+
     def _initialize_controllers(self):
         self._download_controller = DownloadController()
         self._folder_controller = FolderController(MANUAL_DOWNLOAD_DIR_KEY, self._home_view.set_base_folder_path)
@@ -187,7 +194,7 @@ class App:
         first_type = encoders[0]["type"]
         self._encoder_var.set(first_type)
         self._on_encoder_selected()
-    
+
     def _on_encoder_selected(self):
         encoder_type = self._encoder_var.get()
         self._home_view.set_video_encoder(encoder_type)
@@ -199,7 +206,7 @@ class App:
             self._home_view.update_status("Checking and Updating")
         else:
             self._explorer_view.update_status("Checking and Updating")
-        self._update_service.update_program(update_status = self._change_status_for_updates)
+        self._update_service.update_program(update_status=self._thread_dispatcher.wrap(self._change_status_for_updates))
 
     def _change_status_for_updates(self, message):
         if self._current_view == self._home_view:
