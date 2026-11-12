@@ -1,8 +1,6 @@
 import os
-import sys
 import sqlite3
 import threading
-from pathlib import Path
 from typing import Callable
 
 from controller.download_controller import DownloadController
@@ -15,24 +13,14 @@ from service.thumbnail_service import ThumbnailService
 from service.search_page_service import SearchPageService
 from service.database_service import add_watch_with_items, is_watching, get_active_or_paused_watch_list
 
+from core.paths import ffmpeg_directory
+
 from concurrent.futures import ThreadPoolExecutor
-
-def _get_app_root() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent.parent
-
-def _get_ffmpeg_dir(app_root) -> Path:
-    if getattr(sys, "frozen", False):
-        return app_root / "_internal" / "ffmpeg"
-    return app_root / "ffmpeg"
-
 SECTION_BATCH_SIZE = 20
 
 class ExploreController:
     def __init__(self, download_controller: DownloadController):
-        app_root = _get_app_root()
-        ffmpeg_dir = _get_ffmpeg_dir(app_root)
+        ffmpeg_dir = ffmpeg_directory()
 
         initilize_database()
 

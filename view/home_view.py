@@ -1,6 +1,5 @@
 import tkinter as tk
 import customtkinter
-from typing import Callable
 
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox

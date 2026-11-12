@@ -1,28 +1,22 @@
-import sys
 import time
 import json
 import subprocess
 import threading
-from pathlib import Path
 from typing import Callable
 
-CACHE_MAX_AGE_SECONDS = 10*(24 * 60 * 60)  # 10 day
+from core.paths import user_data_dir, ffmpeg_directory
 
-def _get_app_root() -> Path:
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent.parent
+CACHE_MAX_AGE_SECONDS = 10*(24 * 60 * 60)  # 10 day
 
 si = subprocess.STARTUPINFO()
 si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
 class EncoderTestService:
     def __init__(self):
-        app_root = _get_app_root()
-        self._ffmpeg_dir = app_root / "ffmpeg"
+        self._ffmpeg_dir = ffmpeg_directory()
         self._ffmpeg_path = self._ffmpeg_dir / 'ffmpeg.exe'
 
-        config_dir = app_root / "config"
+        config_dir = user_data_dir() / "config"
         config_dir.mkdir(exist_ok=True)
         self._cache_path = config_dir / "encoder_cache.json"
 

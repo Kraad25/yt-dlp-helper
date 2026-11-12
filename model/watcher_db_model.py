@@ -1,14 +1,9 @@
-import sys
 import sqlite3
-from pathlib import Path
 from contextlib import contextmanager
 
-def _get_app_root() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent.parent  # model/ -> root
+from core.paths import user_data_dir
 
-WATCHER_DB_PATH = _get_app_root() / "data" / "watcher.db"
+WATCHER_DB_PATH = user_data_dir() / "database" / "watcher.db"
 WATCHER_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 def get_database_connection():

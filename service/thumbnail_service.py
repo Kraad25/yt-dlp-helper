@@ -1,4 +1,3 @@
-import sys
 import io
 import hashlib
 import threading
@@ -8,18 +7,14 @@ from typing import Callable
 
 from PIL import Image
 
-def _get_app_root() -> Path:
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent.parent  # service/ -> root
+from core.paths import user_data_dir
 
 class ThumbnailService:
     def __init__(self, width: int = 160, height: int = 90):
         self._width = width
         self._height = height
 
-        app_root = _get_app_root()
-        cache_dir = app_root / "config" / "thumbnail_cache"
+        cache_dir = user_data_dir() / "config" / "thumbnail_cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
         self._cache_dir = cache_dir
 

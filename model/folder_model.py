@@ -1,17 +1,11 @@
 import os
-import sys
 import json
-from pathlib import Path
 
-def _get_app_root() -> Path:
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent.parent  # model/ -> root
+from core.paths import user_data_dir
 
 class FolderModel:
     def __init__(self, key: str):
-        app_root = _get_app_root()
-        config_dir = app_root / "config"
+        config_dir = user_data_dir() / "config"
         config_dir.mkdir(exist_ok=True)
         self._config_path = (config_dir / "folder_config.json")
 

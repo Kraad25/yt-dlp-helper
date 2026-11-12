@@ -10,12 +10,14 @@ import json
 from typing import Callable
 from pathlib import Path
 
+from core.paths import install_dir, ffmpeg_directory
+
 class UpdateService:
     def __init__(self):
-        self._app_root = self._get_app_root()
+        self._app_root = install_dir()
         self._libs_dir = self._app_root / "libs"
         self._python_exe = self._app_root / "python-embed" / "python.exe"
-        self._ffmpeg_dir = self._get_ffmpeg_dir()
+        self._ffmpeg_dir = ffmpeg_directory()
 
         self._PYPI_URL = "https://pypi.org/pypi/yt-dlp/json"
 
@@ -42,16 +44,6 @@ class UpdateService:
             return "unknown"
 
     # Private
-    def _get_app_root(self) -> Path:
-        if getattr(sys, "frozen", False):
-            return Path(sys.executable).resolve().parent
-        return Path(__file__).resolve().parent.parent
-    
-    def _get_ffmpeg_dir(self) -> Path:
-        if getattr(sys, "frozen", False):
-            return self._app_root / "_internal" / "ffmpeg"
-        return self._app_root / "ffmpeg"
-
     def _parse_version(self, version: str) -> tuple:
         return tuple(int(part) for part in version.split("."))
 

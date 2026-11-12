@@ -1,13 +1,10 @@
 import json
-from pathlib import Path
-
 import customtkinter
 
-def _get_app_root() -> Path:
-    return Path(__file__).resolve().parent.parent  # view/ -> root
+from core.paths import resource_dir
 
 class AppTheme:
-    _THEME_PATH = _get_app_root() / "custom_themes" / "warm_refined.json"
+    _THEME_PATH = resource_dir() / "custom_themes" / "warm_refined.json"
     _APPEARANCE_MODE = "light" 
 
     def __init__(self):

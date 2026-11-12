@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+from core.paths import migrate_legacy_data
+
 def _bootstrap_libs_path():
     if getattr(sys, "frozen", False):
         app_root = Path(sys.executable).resolve().parent
@@ -10,6 +12,7 @@ def _bootstrap_libs_path():
     sys.path.insert(0, str(libs_dir))
 
 _bootstrap_libs_path()
+migrate_legacy_data()
 
 import tkinter as tk
 from tkinter import messagebox

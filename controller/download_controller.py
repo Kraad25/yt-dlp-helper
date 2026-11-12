@@ -1,12 +1,10 @@
 import os
-import sys
 import glob
 import time
 import gc
 import threading
 from dataclasses import dataclass, field
 from typing import Callable
-from pathlib import Path
 
 from yt_dlp.utils import DownloadCancelled, sanitize_filename
 from urllib.parse import urlparse, parse_qs
@@ -16,15 +14,7 @@ from model.youtube_model import YoutubeModel
 from service.error_service import ErrorHandlingService
 from service.video_processing_service import VideoProcessingService
 
-def _get_app_root() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent.parent
-
-def _get_ffmpeg_dir(app_root) -> Path:
-    if getattr(sys, "frozen", False):
-        return app_root / "_internal" / "ffmpeg"
-    return app_root / "ffmpeg"
+from core.paths import ffmpeg_directory
 
 @dataclass
 class DownloadJob:
@@ -44,8 +34,7 @@ class DownloadJob:
 
 class DownloadController:    
     def __init__(self):
-        app_root = _get_app_root()
-        self._ffmpeg_dir = _get_ffmpeg_dir(app_root)
+        self._ffmpeg_dir = ffmpeg_directory()
         
         self._youtube_model = YoutubeModel(self._ffmpeg_dir)
         self._video_processor = VideoProcessingService(self._ffmpeg_dir)

@@ -1,5 +1,4 @@
 from model.watcher_db_model import db_transaction
-from typing import Callable
 
 ITEM_STATUS_NEW = "new"
 ITEM_STATUS_DOWNLOADED = "downloaded"
