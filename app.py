@@ -153,8 +153,6 @@ class App:
             explore_controller=self._explore_controller,
             folder_controller=self._explore_folder_controller,
         )
-                
-        self._home_view.set_cancel_callback(self._download_controller.cancel_download)
 
     # Views
     def _show_home(self):

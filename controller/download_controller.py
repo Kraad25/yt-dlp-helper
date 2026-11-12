@@ -4,6 +4,7 @@ import glob
 import time
 import gc
 import threading
+from dataclasses import dataclass, field
 from typing import Callable
 from pathlib import Path
 
@@ -25,6 +26,22 @@ def _get_ffmpeg_dir(app_root) -> Path:
         return app_root / "_internal" / "ffmpeg"
     return app_root / "ffmpeg"
 
+@dataclass
+class DownloadJob:
+    url: str
+    mode: str
+    quality: str
+    out_dir: str
+    encoder: str
+
+    on_status: Callable[[str], None]
+    on_progress: Callable[[int], None] = lambda percent: None
+    on_download_enabled: Callable[[bool], None] = lambda enabled: None
+    on_cancel_enabled: Callable[[bool], None] = lambda enabled: None
+
+    cancel: threading.Event = field(default_factory=threading.Event)
+    partial_files: set = field(default_factory=set)
+
 class DownloadController:    
     def __init__(self):
         app_root = _get_app_root()
@@ -33,15 +50,6 @@ class DownloadController:
         self._youtube_model = YoutubeModel(self._ffmpeg_dir)
         self._video_processor = VideoProcessingService(self._ffmpeg_dir)
         self._error = ErrorHandlingService()
-
-        self._enable_download: Callable = None
-        self._enable_cancel: Callable = None
-        self._update_progress: Callable = None
-        self._update_status: Callable = None
-        self._cancel_flag = threading.Event()
-        self._encoder = "CPU"
-
-        self._partial_files: set[str] = set()
 
     # Public Methods
     def download_requested(
@@ -53,150 +61,127 @@ class DownloadController:
             enable_cancel: Callable,
             update_progress: Callable, 
             update_status: Callable
-    ):
+    ) -> DownloadJob | None:
 
-        self._set_callbacks(enable_download, enable_cancel, update_progress, update_status)
-        self._enable_download(False)
-        self._enable_cancel(True)
-        self._encoder = encoder
+        job = DownloadJob(
+            url=data.get("url", ""),
+            mode=data.get("mode", ""),
+            quality=data.get("quality", ""),
+            out_dir=path,
+            encoder=encoder,
+            on_status=update_status,
+            on_progress=update_progress,
+            on_download_enabled=enable_download,
+            on_cancel_enabled=enable_cancel,
+        )
 
-        url = data.get("url", "")
-        mode = data.get("mode", "")
-        quality = data.get("quality", "")
+        if not self._validate_data(job):
+            return None
 
-        self._partial_files.clear()
+        job.on_download_enabled(False)
+        job.on_cancel_enabled(True)
+        job.on_progress(0)
+        job.on_status("Downloading")
 
-        if not self._validate_data(url, mode):
-            self._enable_cancel(False)
-            self._enable_download(True)
-            return
+        target = self._run_video_download if job.mode == "mp4" else self._run_audio_download
+        threading.Thread(target=target, args=(job,), daemon=True).start()
+        return job
 
-        if mode == 'mp4':
-            self._request_video_download(url, path, quality)
-        else:
-            self._request_audio_download(url, path, quality)    
-
-        self._update_progress(0)
-        self._update_status("Downloading")
-
-    def cancel_download(self):
-        self._cancel_flag.set()
-        if self._update_status:
-            self._update_status("Cancellation requested.....")
+    def cancel_download(self, job: DownloadJob):
+        job.cancel.set()
+        job.on_status("Cancellation requested.....")
 
     # Private Methods
-    def _set_callbacks(
-            self, 
-            enable_download: Callable,
-            enable_cancel: Callable, 
-            update_progress: Callable, 
-            update_status: Callable
-    ):
-        self._enable_download: Callable = enable_download
-        self._enable_cancel: Callable = enable_cancel
-        self._update_progress: Callable = update_progress
-        self._update_status: Callable = update_status
-
-    def _validate_data(self, url: str, mode: str):
-        error_msg = DownloadValidator.validate(url, mode)
+    def _validate_data(self, job: DownloadJob) -> bool:
+        error_msg = DownloadValidator.validate(job.url, job.mode)
         if error_msg:
-            self._error.handle_error(update_status=self._update_status, custom_msg=error_msg)
+            self._error.handle_error(update_status=job.on_status, custom_msg=error_msg)
             return False
         return True
-        
-    def _request_audio_download(self, url: str, folderPath: str, quality: str):
-        thread = threading.Thread(target=self._run_audio_download, args=(url, folderPath, quality), daemon=True)
-        thread.start()
-
-    def _request_video_download(self, url: str, folderPath: str, quality: str):
-        thread = threading.Thread(target=self._run_video_download,args=(url, folderPath, quality),daemon=True)
-        thread.start()
     
-    def _run_audio_download(self, url: str, folderPath: str, quality: str):
+    def _run_audio_download(self, job: DownloadJob):
         try:
-            url = self._normalize_url(url)
-            folderPath = self._resolve_target_dir(url, folderPath)
+            url = self._normalize_url(job.url)
+            folder_path = self._resolve_target_dir(url, job.out_dir)
 
-            downloaded_files = self._youtube_model.audio_download(url=url, 
-                                             out_dir=folderPath, 
-                                             quality=quality, 
-                                             progress_hook = self._progress_hook
-                                            )
+            downloaded_files = self._youtube_model.audio_download(
+                url=url,
+                out_dir=folder_path,
+                quality=job.quality,
+                progress_hook=lambda data: self._progress_hook(job, data),
+            )
 
-            if not self._cancel_flag.is_set():
+            if not job.cancel.is_set():
                 saved = [file for file in downloaded_files if os.path.exists(file)]
                 if saved:
-                    self._update_status(f"Done: {len(saved)} item downloaded")
+                    job.on_status("Done")
                 else:
-                    self._update_status("Download failed, nothing was saved")
+                    job.on_status("Download failed, nothing was saved")
 
         except Exception as e:
-            if not self._cancel_flag.is_set():
-                self._error.handle_error(update_status=self._update_status, error=e)
+            if not job.cancel.is_set():
+                self._error.handle_error(update_status=job.on_status, error=e)
 
         finally:
-            if self._cancel_flag.is_set():
-                self._cleanup_partial_files()
-                self._update_status("Download cancelled")
-            self._cancel_flag.clear()
-            self._enable_cancel(False)
-            self._enable_download(True)
+            self._finish_job(job)
 
-    def _run_video_download(self, url: str, folderPath: str, quality: str):
+    def _run_video_download(self, job: DownloadJob):
         try:
-            url = self._normalize_url(url)
-            folderPath = self._resolve_target_dir(url, folderPath)
+            url = self._normalize_url(job.url)
+            folder_path = self._resolve_target_dir(url, job.out_dir)
 
             downloaded_files = self._youtube_model.video_download(
-                                                url=url,
-                                                out_dir=folderPath,
-                                                quality=quality,
-                                                progress_hook = self._progress_hook
-                                            )
+                url=url,
+                out_dir=folder_path,
+                quality=job.quality,
+                progress_hook=lambda data: self._progress_hook(job, data),
+            )
 
-            if not self._cancel_flag.is_set():                
+            if not job.cancel.is_set():
                 saved = [file for file in downloaded_files if os.path.exists(file)]
 
                 if not saved:
-                    self._update_status("Download failed, nothing was saved")
+                    job.on_status("Download failed, nothing was saved")
                 else:
                     for i, file in enumerate(saved, 1):
-                        self._update_status(f"Transcoding {i}/{len(saved)} ...")
-                        self._video_processor.transcode(file, self._encoder)
+                        job.on_status(f"Transcoding {i}/{len(saved)} ...")
+                        self._video_processor.transcode(file, job.encoder)
 
-                    self._update_status(f"Done: {len(saved)} item downloaded")
-            
+                    job.on_status(f"Done: {len(saved)} item downloaded")
+
         except Exception as e:
-            if not self._cancel_flag.is_set():
-                self._error.handle_error(update_status=self._update_status, error=e)
+            if not job.cancel.is_set():
+                self._error.handle_error(update_status=job.on_status, error=e)
 
         finally:
-            if self._cancel_flag.is_set():
-                self._cleanup_partial_files()
-                self._update_status("Download cancelled")
-            self._cancel_flag.clear()
-            self._enable_cancel(False)
-            self._enable_download(True)
+            self._finish_job(job)
 
-    def _progress_hook(self, data: dict):        
+    def _finish_job(self, job: DownloadJob):
+        if job.cancel.is_set():
+            self._cleanup_partial_files(job)
+            job.on_status("Download cancelled")
+        job.on_cancel_enabled(False)
+        job.on_download_enabled(True)
+
+    def _progress_hook(self, job: DownloadJob, data: dict):
         if data['status'] == 'downloading':
             temp = data.get('tmpfilename')
             if temp:
-                self._partial_files.add(temp)
-                
+                job.partial_files.add(temp)
+
             total = data.get('total_bytes') or data.get('total_bytes_estimate', 1)
             downloaded = data.get('downloaded_bytes', 0)
             percent = int((downloaded / total) * 100)
 
-            self._update_progress(percent)
-            self._update_status(f"Downloading: {percent}%")
+            job.on_progress(percent)
+            job.on_status(f"Downloading: {percent}%")
 
-            if self._cancel_flag.is_set():
-                self._enable_cancel(False)
+            if job.cancel.is_set():
+                job.on_cancel_enabled(False)
                 raise DownloadCancelled("Download cancelled by user")
-        
+
         elif data['status'] == 'finished':
-            self._update_status("Processing file...")
+            job.on_status("Processing file...")
 
     def _resolve_target_dir(self, url: str, base_dir: str) -> str:
         try:
@@ -211,13 +196,13 @@ class DownloadController:
             path = os.path.join(base_dir, name)
             os.makedirs(path, exist_ok=True)
             return path.replace("\\", "/")
-        
+
         except Exception:
             return base_dir
 
-    def _cleanup_partial_files(self):
+    def _cleanup_partial_files(self, job: DownloadJob):
         gc.collect()
-        for temp in self._partial_files:
+        for temp in job.partial_files:
             base = temp[:-5] if temp.endswith(".part") else temp
             targets = [
                 temp,
@@ -227,7 +212,7 @@ class DownloadController:
             for path in targets:
                 self._remove_with_retry(path)
 
-        self._partial_files.clear()
+        job.partial_files.clear()
 
     def _remove_with_retry(self, path: str, attempts: int = 5, delay: float = 0.5):
         for _ in range(attempts):
@@ -235,9 +220,9 @@ class DownloadController:
                 if os.path.exists(path):
                     os.remove(path)
                 return
-            except PermissionError as e:
+            except PermissionError:
                 time.sleep(delay)
-            except Exception as e:
+            except Exception:
                 return
 
     def _normalize_url(self, url: str) -> str:

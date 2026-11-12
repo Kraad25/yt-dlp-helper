@@ -116,7 +116,7 @@ class ExploreController:
         update_progress: Callable = lambda value: None,
     ):
         data = {"url": url, "mode": mode, "quality": quality}
-        self._download_controller.download_requested(
+        return self._download_controller.download_requested(
             data,
             path,
             encoder,

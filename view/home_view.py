@@ -40,7 +40,7 @@ class HomeView(BaseView):
         self._download_controller: DownloadController = None
         self._folder_controller: FolderController = None
 
-        self._on_cancel: Callable = None
+        self._current_job = None
         self._video_encoder: str = "CPU"
         self._thread_dispatcher = None
 
@@ -53,9 +53,6 @@ class HomeView(BaseView):
 
     def set_thread_dispatcher(self, dispatcher):
         self._thread_dispatcher = dispatcher
-
-    def set_cancel_callback(self, callback: Callable):
-        self._on_cancel = callback
 
     def set_base_folder_path(self, path: str):
         if self._destination_entry:
@@ -93,7 +90,7 @@ class HomeView(BaseView):
         data = self._get_form_data()
         path = data.get("path", "")
 
-        self._download_controller.download_requested(
+        self._current_job = self._download_controller.download_requested(
             data,
             path,
             self._video_encoder,
@@ -118,8 +115,8 @@ class HomeView(BaseView):
         self._quality_selector.switch_mode(mode)
 
     def _on_cancel_clicked(self):
-        if self._on_cancel:
-            self._on_cancel()
+        if self._current_job:
+            self._download_controller.cancel_download(self._current_job)
 
     def _enter_download_state(self):
         self._download_button.grid_configure(column=0, columnspan=1)
