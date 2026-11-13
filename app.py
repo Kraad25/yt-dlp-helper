@@ -19,6 +19,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from core.ui_thread_dispatcher import UiThreadDispatcher
+from core.paths import resource_dir
 
 from view.theme import AppTheme
 from view.home_view import HomeView
@@ -60,9 +61,9 @@ class App:
         self._explore_folder_controller: FolderController = None
 
         self._update_service: UpdateService = None
+        self._updating = False
 
         self._encoder_var = tk.StringVar(value="CPU")
-        self._available_encoders: list[dict] = []
 
         self._setup()
 
@@ -83,7 +84,7 @@ class App:
         self._update_service = UpdateService()
         
         try:
-            self.root.iconbitmap('flag.ico')
+            self.root.iconbitmap(resource_dir()/"flag.ico")
         except Exception:
             pass
 
@@ -103,14 +104,14 @@ class App:
     def _create_menu_bar(self):
         menubar = tk.Menu(self.root)
 
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Home", command=self._show_home)
-        file_menu.add_command(label="Explore Youtube", command=self._show_explore)
-        file_menu.add_separator()
-        file_menu.add_command(label="Update", command=self._check_for_updates)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.root.quit)
+        self._file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=self._file_menu)
+        self._file_menu.add_command(label="Home", command=self._show_home)
+        self._file_menu.add_command(label="Explore Youtube", command=self._show_explore)
+        self._file_menu.add_separator()
+        self._file_menu.add_command(label="Update", command=self._check_for_updates)
+        self._file_menu.add_separator()
+        self._file_menu.add_command(label="Exit", command=self.root.destroy)
 
         about_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="About", menu=about_menu)
@@ -168,8 +169,6 @@ class App:
 
     # Encoder Selection
     def _on_encoders_detected(self, encoders: list):
-        self._available_encoders = encoders
-
         self._encoder_menu.delete(0, 'end')
 
         if not encoders:
@@ -203,17 +202,24 @@ class App:
 
     # Update yt-dlp & ffmpeg
     def _check_for_updates(self):
-        if self._current_view == self._home_view:
-            self._home_view.update_status("Checking and Updating")
-        else:
-            self._explorer_view.update_status("Checking and Updating")
-        self._update_service.update_program(update_status=self._thread_dispatcher.wrap(self._change_status_for_updates))
+        if self._updating:
+            return
+        self._updating = True
+        self._file_menu.entryconfigure("Update", state="disabled")
+
+        self._change_status_for_updates("Checking and Updating")
+        self._update_service.update_program(
+            update_status=self._thread_dispatcher.wrap(self._change_status_for_updates),
+            on_done=self._thread_dispatcher.wrap(self._on_update_finished),
+        )
+
+    def _on_update_finished(self):
+        self._updating = False
+        self._file_menu.entryconfigure("Update", state="normal")
 
     def _change_status_for_updates(self, message):
-        if self._current_view == self._home_view:
-            self._home_view.update_status(message)
-        else:
-            self._explorer_view.update_status(message)
+        self._home_view.update_status(message)
+        self._explorer_view.update_status(message)
 
     # About Section
     def _show_about(self):
@@ -225,7 +231,7 @@ class App:
 
         messagebox.showinfo(
             "About",
-            f"YouTube Converter {VERSION}\n\n"
+            f"Media Downloader {VERSION}\n\n"
             "This program uses yt-dlp for downloading and processing media.\n"
             "Project page and supported sites:\n"
             "https://github.com/yt-dlp/yt-dlp\n\n"

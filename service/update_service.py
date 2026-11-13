@@ -23,8 +23,8 @@ class UpdateService:
 
 
     # Public
-    def update_program(self, update_status: Callable):
-        thread = threading.Thread(target=self._run_update_sequence, args=(update_status,), daemon=True)
+    def update_program(self, update_status: Callable, on_done: Callable = lambda: None):
+        thread = threading.Thread(target=self._run_update_sequence, args=(update_status, on_done), daemon=True)
         thread.start()
 
     def get_ytdlp_version(self) -> str:
@@ -125,13 +125,16 @@ class UpdateService:
             update_status(f"ffmpeg Update Failed: {str(e)}")
             return None
         
-    def _run_update_sequence(self, update_status: Callable) -> None:
-        ytdlp_result = self._update_yt_dlp(update_status)
-        if ytdlp_result is None:
-            return
+    def _run_update_sequence(self, update_status: Callable, on_done: Callable) -> None:
+        try:
+            ytdlp_result = self._update_yt_dlp(update_status)
+            if ytdlp_result is None:
+                return
 
-        ffmpeg_result = self._update_ffmpeg(update_status)
-        if ffmpeg_result is None:
-            return
+            ffmpeg_result = self._update_ffmpeg(update_status)
+            if ffmpeg_result is None:
+                return
 
-        update_status(f"{ytdlp_result}. {ffmpeg_result}")
+            update_status(f"{ytdlp_result}. {ffmpeg_result}")
+        finally:
+            on_done()
