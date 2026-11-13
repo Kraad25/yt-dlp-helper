@@ -5,7 +5,7 @@ from pathlib import Path
 SECTION_INDEX_LIMIT = 500
 _FILE_HOOK_PP = 'MoveFiles'
 
-class YoutubeModel:
+class YoutubeService:
     def __init__(self, ffmpeg_dir: Path= None):
         self._ffmpeg_dir = ffmpeg_dir
 

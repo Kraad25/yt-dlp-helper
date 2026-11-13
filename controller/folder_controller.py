@@ -1,6 +1,5 @@
 import os
 from typing import Callable
-from tkinter import filedialog
 from model.folder_model import FolderModel
 
 class FolderController:
@@ -22,8 +21,7 @@ class FolderController:
             return saved
         return self._default_directory()
 
-    def browse_folder(self):
-        selected = filedialog.askdirectory(initialdir=self.get_base_directory())
+    def store_destination_path(self, selected):
         if not selected:
             return
         self._model.set_base_directory(selected)

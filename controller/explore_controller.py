@@ -1,14 +1,13 @@
 import os
-import sqlite3
 import threading
 from typing import Callable
 
 from controller.download_controller import DownloadController
 
-from model.youtube_model import YoutubeModel, SECTION_INDEX_LIMIT
 from model.watcher_db_model import initilize_database
 from model.validators import WatcherValidator
 
+from service.youtube_service import YoutubeService, SECTION_INDEX_LIMIT
 from service.thumbnail_service import ThumbnailService
 from service.search_page_service import SearchPageService
 from service.database_service import add_watch_with_items, is_watching, get_active_or_paused_watch_list
@@ -16,6 +15,7 @@ from service.database_service import add_watch_with_items, is_watching, get_acti
 from core.paths import ffmpeg_directory
 
 from concurrent.futures import ThreadPoolExecutor
+
 SECTION_BATCH_SIZE = 20
 
 class ExploreController:
@@ -24,16 +24,17 @@ class ExploreController:
 
         initilize_database()
 
-        self._youtube_model = YoutubeModel(ffmpeg_dir)
-        self._search_pager = SearchPageService(fetch=self._youtube_model.search_videos)
+        self._youtube_service = YoutubeService(ffmpeg_dir)
+        self._search_pager = SearchPageService(fetch=self._youtube_service.search_videos)
         self._thumbnail_service = ThumbnailService()
-        self._validator = WatcherValidator()
+        self._validator = WatcherValidator
         self._download_controller = download_controller
 
         self._section_url = ""
         self._section_offset = 0
         self._section_generation = 0
-        self._encoder = "CPU"
+        self._pending_watch: dict | None = None
+        self._pending_items: list[dict] = []
 
         self._cover_pool = ThreadPoolExecutor(max_workers=6)
         self._cover_cache: dict[str, str] = {}
@@ -66,13 +67,7 @@ class ExploreController:
         self._section_generation += 1
 
     def get_thumbnail(self, thumbnail_url: str, widget: object, on_ready: Callable):
-        self._thumbnail_service.fetch_async(thumbnail_url, widget, on_ready)
-
-    def list_section(self, section_url: str, on_ready: Callable, on_error: Callable = None):
-        thread = threading.Thread(
-            target=self._run_list_section, args=(section_url, on_ready, on_error), daemon=True
-        )
-        thread.start()
+        self._thumbnail_service.fetch_async(thumbnail_url, widget, on_ready)    
 
     def get_playlist_cover(self, playlist_url: str, on_ready: Callable):
         cached = self._cover_cache.get(playlist_url)
@@ -81,12 +76,44 @@ class ExploreController:
             return
 
         def task():
-            cover = self._youtube_model.get_playlist_cover(playlist_url)
+            cover = self._youtube_service.get_playlist_cover(playlist_url)
             if cover:
                 self._cover_cache[playlist_url] = cover
             on_ready(cover)
 
         self._cover_pool.submit(task)
+
+    
+    def start_watch(self, section_name, destination, auto_download, poll_interval, on_ready: Callable, on_error: Callable = None):
+        self._pending_watch = {
+            "section_url": self._section_url,
+            "section_name": section_name,
+            "destination_path": destination,
+            "auto_download": auto_download,
+            "poll_interval": poll_interval or WatcherValidator.MIN_POLL_INTERVAL,
+        }
+
+        self._pending_items = []
+
+        threading.Thread(
+            target=self._run_list_section,
+            args=(self._section_url, on_ready, on_error),
+            daemon=True,
+        ).start()
+
+    def finish_watch(self, ticked_ids: set) -> str | None:
+        if not self._pending_watch:
+            return "Nothing to save"
+
+        for item in self._pending_items:
+            item["status"] = "queued" if item["id"] in ticked_ids else "ignored"
+
+        error = self._save_watch(self._pending_watch, self._pending_items)
+
+        self._pending_watch = None
+        self._pending_items = []
+
+        return error
 
     def get_watches(self, is_active: bool) -> list[dict]:
         return get_active_or_paused_watch_list(is_active)
@@ -125,7 +152,8 @@ class ExploreController:
 
     def _run_list_section(self, section_url: str, on_ready: Callable, on_error: Callable):
         try:
-            items = self._youtube_model.get_section_index(section_url)
+            items = self._youtube_service.get_section_index(section_url)
+            self._pending_items = items
             truncated = len(items) >= SECTION_INDEX_LIMIT
             on_ready(items, truncated)
         except Exception as e:
@@ -142,7 +170,7 @@ class ExploreController:
 
     def _run_browse_section(self, section_url: str, offset: int, generation: int, on_ready: Callable, on_error: Callable):
         try:
-            items = self._youtube_model.get_section_contents(
+            items = self._youtube_service.get_section_contents(
                 section_url, limit=SECTION_BATCH_SIZE, offset=offset
             )
             if generation != self._section_generation:
@@ -165,28 +193,27 @@ class ExploreController:
 
     def _run_browse_channel(self, channel_url: str, on_ready: Callable, on_error: Callable):
         try:
-            sections = self._youtube_model.get_channel_sections(channel_url)
+            sections = self._youtube_service.get_channel_sections(channel_url)
             on_ready(sections)
         except Exception as e:
             if on_error:
                 on_error(str(e))
 
-    def save_watch(self, section_info: dict, items: list[dict]) -> str | None:
+    def _save_watch(self, section_info: dict, items: list[dict]) -> str | None:
         error = self._validator.validate(section_info)
         if error:
             return error
 
-        section_info["poll_interval"] = int(section_info["poll_interval"])
-
         if is_watching(section_info["section_url"]):
             return "Already in your watch list"
 
+        info = {**section_info, "poll_interval": int(section_info["poll_interval"])}
+
         try:
-            os.makedirs(section_info["destination_path"], exist_ok=True)
-            add_watch_with_items(section_info, items)
-        except sqlite3.IntegrityError:
-            return "Already in your watch list"
+            os.makedirs(info["destination_path"], exist_ok=True)
         except OSError as e:
             return f"Couldn't create the folder: {e}"
 
+        if not add_watch_with_items(info, items):
+            return "Already in your watch list"
         return None

@@ -1,3 +1,4 @@
+import sqlite3
 from model.watcher_db_model import db_transaction
 
 ITEM_STATUS_NEW = "new"
@@ -20,24 +21,28 @@ def add_watch_with_items(section_info: dict, items: list[dict]):
         )
         for item in items
     ]
-    with db_transaction() as connection:
-        connection.execute(
-            """
-            INSERT INTO watch_list
-                (section_url, section_name, destination_path, auto_download, is_active, poll_interval)
-            VALUES (?, ?, ?, ?, 1, ?)
-            """,
-            (section_url, section_info["section_name"], section_info["destination_path"],
-             section_info["auto_download"], section_info["poll_interval"]),
-        )
-        connection.executemany(
-            """
-            INSERT OR IGNORE INTO items
-                (item_id, title, url, item_status, thumbnail_url, section_url)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            rows,
-        )
+    try:
+        with db_transaction() as connection:
+            connection.execute(
+                """
+                INSERT INTO watch_list
+                    (section_url, section_name, destination_path, auto_download, is_active, poll_interval)
+                VALUES (?, ?, ?, ?, 1, ?)
+                """,
+                (section_url, section_info["section_name"], section_info["destination_path"],
+                section_info["auto_download"], section_info["poll_interval"]),
+            )
+            connection.executemany(
+                """
+                INSERT OR IGNORE INTO items
+                    (item_id, title, url, item_status, thumbnail_url, section_url)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
 
 ## Getters
 def get_watch_list() -> list[dict]:

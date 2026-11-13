@@ -25,27 +25,20 @@ class ErrorHandlingService:
             "ffmpeg": "FFmpeg error - check installation",
         }
 
-    def handle_error(self, update_status, error: Exception=None, custom_msg: str=None):
-        if custom_msg is not None:
-            update_status(custom_msg)
-            return
-        
+    def classify_error(self, error: Exception=None):
         if error is None:
-            update_status("Error: Unknown")
-            return
+            return "Error: Unknown"
 
         error_str = str(error).lower()
 
         # Special-Case: Exceptions raised on purpose
         if "cancelled by user" in error_str:
-            update_status("Download cancelled")
-            return
+            return "Download cancelled"
         
         # Generic Errors
         for pattern, value in self._patterns.items():
             if pattern in error_str:
-                update_status(f"Error: {value}")
-                return
+                return f"Error: {value}"
             
         # Fallback
-        update_status(f"RawError: {str(error)}")
+        return f"RawError: {str(error)}"

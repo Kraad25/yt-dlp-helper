@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import filedialog
+
 import customtkinter
 
 from view.BaseView import BaseView
@@ -100,7 +102,8 @@ class HomeView(BaseView):
         )
 
     def _on_browse_clicked(self):
-        self._folder_controller.browse_folder()
+        selected = filedialog.askdirectory(initialdir=self._folder_controller.get_base_directory())
+        self._folder_controller.store_destination_path(selected)
 
     def _on_segmented_change(self, value):
         if "Mp3" in value:

@@ -10,7 +10,8 @@ from yt_dlp.utils import DownloadCancelled, sanitize_filename
 from urllib.parse import urlparse, parse_qs
 
 from model.validators import DownloadValidator
-from model.youtube_model import YoutubeModel
+
+from service.youtube_service import YoutubeService
 from service.error_service import ErrorHandlingService
 from service.video_processing_service import VideoProcessingService
 
@@ -36,7 +37,7 @@ class DownloadController:
     def __init__(self):
         self._ffmpeg_dir = ffmpeg_directory()
         
-        self._youtube_model = YoutubeModel(self._ffmpeg_dir)
+        self._youtube_service = YoutubeService(self._ffmpeg_dir)
         self._video_processor = VideoProcessingService(self._ffmpeg_dir)
         self._error = ErrorHandlingService()
 
@@ -82,9 +83,9 @@ class DownloadController:
 
     # Private Methods
     def _validate_data(self, job: DownloadJob) -> bool:
-        error_msg = DownloadValidator.validate(job.url, job.mode)
-        if error_msg:
-            self._error.handle_error(update_status=job.on_status, custom_msg=error_msg)
+        custom_error_msg = DownloadValidator.validate(job.url, job.mode)
+        if custom_error_msg:            
+            job.on_status(custom_error_msg)
             return False
         return True
     
@@ -93,7 +94,7 @@ class DownloadController:
             url = self._normalize_url(job.url)
             folder_path = self._resolve_target_dir(url, job.out_dir)
 
-            downloaded_files = self._youtube_model.audio_download(
+            downloaded_files = self._youtube_service.audio_download(
                 url=url,
                 out_dir=folder_path,
                 quality=job.quality,
@@ -109,7 +110,7 @@ class DownloadController:
 
         except Exception as e:
             if not job.cancel.is_set():
-                self._error.handle_error(update_status=job.on_status, error=e)
+                self._report_error(e, job)
 
         finally:
             self._finish_job(job)
@@ -119,7 +120,7 @@ class DownloadController:
             url = self._normalize_url(job.url)
             folder_path = self._resolve_target_dir(url, job.out_dir)
 
-            downloaded_files = self._youtube_model.video_download(
+            downloaded_files = self._youtube_service.video_download(
                 url=url,
                 out_dir=folder_path,
                 quality=job.quality,
@@ -140,7 +141,7 @@ class DownloadController:
 
         except Exception as e:
             if not job.cancel.is_set():
-                self._error.handle_error(update_status=job.on_status, error=e)
+                self._report_error(e, job)
 
         finally:
             self._finish_job(job)
@@ -174,7 +175,7 @@ class DownloadController:
 
     def _resolve_target_dir(self, url: str, base_dir: str) -> str:
         try:
-            info = self._youtube_model.get_url_info(url)
+            info = self._youtube_service.get_url_info(url)
             if not info.get("is_playlist"):
                 return base_dir
 
@@ -220,3 +221,7 @@ class DownloadController:
         if list_id.startswith(("OLAK5uy", "PL")):
             return f"https://www.youtube.com/playlist?list={list_id}"
         return url
+
+    def _report_error(self, e: Exception, job: DownloadJob):
+        error = self._error.classify_error(error=e)
+        job.on_status(error)

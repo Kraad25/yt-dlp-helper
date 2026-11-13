@@ -1,6 +1,7 @@
 import os
 
 import customtkinter
+from tkinter import filedialog
 
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox
@@ -54,8 +55,6 @@ class ExplorerView(BaseView):
         self._current_section_title: str = ""
         self._current_section_url: str = ""
         self._current_channel_name: str = ""
-        self._section_info: dict | None = None
-        self._backfill_item_info: list[dict] = []
 
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
@@ -87,7 +86,8 @@ class ExplorerView(BaseView):
 
     # Event Handlers
     def _on_browse_clicked(self):
-        self._folder_controller.browse_folder()
+        selected = filedialog.askdirectory(initialdir=self._folder_controller.get_base_directory())
+        self._folder_controller.store_destination_path(selected)
 
     def _on_segmented_change(self, value):
         self._mode_var.set(Mode.MP3 if "Mp3" in value else Mode.MP4)
@@ -607,7 +607,6 @@ class ExplorerView(BaseView):
 
     ### Section and Backfill event handlers
     def _open_backfill_dialog(self, items: list, truncated: bool):
-        self._backfill_item_info = items
         if not items:
             self.update_status("Nothing to back-fill here.")
             return
@@ -620,35 +619,17 @@ class ExplorerView(BaseView):
         )
 
     def _on_watch_channel_confirmed(self, section_name, destination, auto_download, poll_interval):
-        self._section_info = {
-            "section_url": self._current_section_url,
-            "section_name": section_name,
-            "destination_path": destination,
-            "auto_download": auto_download, 
-            "poll_interval": poll_interval if poll_interval else "15"
-        }
-
         self.update_status("Loading all videos...")
-        self._explore_controller.list_section(
-            self._current_section_url,
+        self._explore_controller.start_watch(
+            section_name, destination, auto_download, poll_interval,
             self._thread_dispatcher.wrap(self._on_section_index_ready),
             self._thread_dispatcher.wrap(self._on_browse_error),
         )
 
     def _on_backfill_confirmed(self, selected: list):
         ticked_ids = {item["id"] for item in selected}
-        for item in self._backfill_item_info:            
-            if item["id"] in ticked_ids:
-                item["status"] = "queued"
-            else:
-                item["status"] = "ignored"
-
-        error = self._explore_controller.save_watch(self._section_info, self._backfill_item_info)
+        error = self._explore_controller.finish_watch(ticked_ids)
         self.update_status(error if error else "Added to your watch list")
         if not error:
             self._refresh_watchlist()
-
-        # Clear it at the end
-        self._section_info = None
-        self._backfill_item_info = []
             
