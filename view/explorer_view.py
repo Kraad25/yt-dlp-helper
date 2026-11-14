@@ -619,12 +619,16 @@ class ExplorerView(BaseView):
         )
 
     def _on_watch_channel_confirmed(self, section_name, destination, auto_download, poll_interval):
-        self.update_status("Loading all videos...")
-        self._explore_controller.start_watch(
+        error = self._explore_controller.start_watch(
             section_name, destination, auto_download, poll_interval,
             self._thread_dispatcher.wrap(self._on_section_index_ready),
             self._thread_dispatcher.wrap(self._on_browse_error),
         )
+        if error:
+            self.update_status(error)
+            return
+        
+        self.update_status("Loading all videos...")
 
     def _on_backfill_confirmed(self, selected: list):
         ticked_ids = {item["id"] for item in selected}

@@ -2,6 +2,8 @@ import customtkinter
 from tkinter import ttk
 from tkinter import filedialog
 
+from model.validators import WatcherValidator
+
 CHECKED = "☑"
 UNCHECKED = "☐"
 
@@ -16,6 +18,7 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
 
         self._display_name_entry = None
         self._destination_entry = None
+        self._error_label = None
         self._custom_interval_entry = None
         self._cancel_button = None
         self._next_button = None
@@ -28,7 +31,14 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
 
     # Event Handlers
     def _on_interval_mode_change(self):
-        self._custom_interval_entry.configure(state="normal" if self._interval_mode_var.get() == "custom" else "disabled")
+        is_custom = self._interval_mode_var.get() == "custom"
+
+        self._custom_interval_entry.configure(state="normal")  # a disabled entry can't be cleared
+        if not is_custom:
+            self._custom_interval_entry.delete(0, "end")
+        self._custom_interval_entry.configure(state="normal" if is_custom else "disabled")
+
+        self._error_label.configure(text="")
 
     def _on_browse(self):
         folder = filedialog.askdirectory(initialdir=self._destination_entry.get())
@@ -39,14 +49,18 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
     def _on_submit(self):
         display_name = self._display_name_entry.get().strip()
         destination = self._destination_entry.get().strip()
-        if not display_name or not destination:
-            return
-
         auto_download = self._auto_download_var.get() == "on"
         poll_interval = None
+
         if self._interval_mode_var.get() == "custom":
-            raw = self._custom_interval_entry.get().strip()
-            poll_interval = int(raw) if raw.isdigit() else None
+            poll_interval = self._custom_interval_entry.get().strip()
+
+        error = WatcherValidator.validate_form(display_name, destination, poll_interval)
+        if error:
+            self._error_label.configure(text=error)
+            return
+        if poll_interval is not None:
+            poll_interval = int(poll_interval)
 
         self.withdraw()
         self.after(200, self.destroy)
@@ -87,6 +101,10 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
         self._request_download_choice()
 
         self._custom_interval_entry = self._request_poll_interval()
+
+        self._error_label = customtkinter.CTkLabel(self, text="", text_color="#C0392B", wraplength=380, justify="left")
+        self._error_label.grid(row=9, column=0, sticky="w", padx=20)
+
         self._cancel_button, self._next_button = self._add_navigation_buttons()        
 
     def _add_header(self, channel_name, section_title):
@@ -144,7 +162,7 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
 
     def _add_navigation_buttons(self):
         btn_row = customtkinter.CTkFrame(self, fg_color="transparent")
-        btn_row.grid(row=9, column=0, sticky="ew", padx=20, pady=(10, 20))
+        btn_row.grid(row=10, column=0, sticky="ew", padx=20, pady=(10, 20))
         btn_row.grid_columnconfigure((0, 1), weight=1)
 
         cancel_button = customtkinter.CTkButton(btn_row, text="Cancel", fg_color="transparent", border_width=1, command=self.destroy)

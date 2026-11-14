@@ -91,6 +91,9 @@ class ExploreController:
 
     
     def start_watch(self, section_name, destination, auto_download, poll_interval, on_ready: Callable, on_error: Callable = None):
+        if is_watching(self._section_url):
+            return "Already in your watch list"
+        
         self._pending_watch = {
             "section_url": self._section_url,
             "section_name": section_name,
@@ -235,9 +238,6 @@ class ExploreController:
         if error:
             return error
 
-        if is_watching(section_info["section_url"]):
-            return "Already in your watch list"
-
         info = {**section_info, "poll_interval": int(section_info["poll_interval"])}
 
         try:
@@ -246,5 +246,5 @@ class ExploreController:
             return f"Couldn't create the folder: {e}"
 
         if not add_watch_with_items(info, items):
-            return "Already in your watch list"
+            return "Couldn't save to your watch list"
         return None

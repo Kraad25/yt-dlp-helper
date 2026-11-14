@@ -51,6 +51,16 @@ class WatcherValidator:
         return None
 
     @staticmethod
+    def validate_form(display_name, destination, poll_interval):
+        if not WatcherValidator._has_section_name(display_name):
+            return WatcherValidator.ERROR_MESSAGES['empty_display_name']
+        if not WatcherValidator._has_destination_path(destination):
+            return WatcherValidator.ERROR_MESSAGES['empty_destination_path']
+        if poll_interval is not None and not WatcherValidator._is_poll_interval_int(poll_interval):
+            return WatcherValidator.ERROR_MESSAGES['wrong_type']
+        return None
+
+    @staticmethod
     def _is_url(url):
         try:
             parsed = urlparse(url.strip())
