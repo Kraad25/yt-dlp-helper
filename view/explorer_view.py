@@ -1,7 +1,9 @@
 import os
 
-import customtkinter
+import tkinter as tk
 from tkinter import filedialog
+
+import customtkinter
 
 from yt_dlp.utils import sanitize_filename
 
@@ -172,7 +174,10 @@ class ExplorerView(BaseView):
                 command=self._on_add_section_to_watchlist,
             )
  
-        self._context_menu.tk_popup(event.x_root, event.y_root)
+        try:
+            self._context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self._context_menu.grab_release()
 
     def _on_download_clicked(self, item_data: dict):
         base_path = self._destination_entry.get().strip()
@@ -422,7 +427,6 @@ class ExplorerView(BaseView):
         return label
 
     def _create_context_menu(self, parent):
-        import tkinter as tk
         menu = tk.Menu(parent, tearoff=0)
         return menu
 
@@ -517,7 +521,7 @@ class ExplorerView(BaseView):
         else:
             channel = entry.get("channel", "")
             duration = entry.get("duration")
-            duration_str = f"{duration // 60}:{duration % 60:02d}" if duration else ""
+            duration_str = self._format_duration(duration)
             subtitle = f"{channel}  •  {duration_str}" if channel else duration_str
  
         subtitle_label = customtkinter.CTkLabel(
@@ -563,6 +567,15 @@ class ExplorerView(BaseView):
             self._show_more_button.grid()
         else:
             self._show_more_button.grid_remove()
+
+    def _format_duration(self, seconds) -> str:
+        if not seconds:
+            return ""
+        minutes, secs = divmod(int(seconds), 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours}:{minutes:02d}:{secs:02d}"
+        return f"{minutes}:{secs:02d}"
             
     ### Watch list rendering functions
     def _refresh_watchlist(self):
@@ -624,6 +637,7 @@ class ExplorerView(BaseView):
             self,
             items=items,
             on_confirm=self._on_backfill_confirmed,
+            on_cancel=self._on_backfill_cancelled,
         )
 
     def _on_watch_channel_confirmed(self, section_name, destination, auto_download, poll_interval):
@@ -644,4 +658,7 @@ class ExplorerView(BaseView):
         self.update_status(error if error else "Added to your watch list")
         if not error:
             self._refresh_watchlist()
+
+    def _on_backfill_cancelled(self):
+        self.update_status("Cancelled, nothing added to your watch list")
             

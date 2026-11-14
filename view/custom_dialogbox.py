@@ -88,7 +88,7 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
         self.resizable(False, False)
 
         self.transient(parent)
-        self.grab_set()
+        self.after(100, self.grab_set)
 
     def _add_widgets(self, channel_name, section_title, default_destination, on_confirm):
         self.grid_columnconfigure(0, weight=1)
@@ -175,13 +175,16 @@ class AddWatchChannelDialog(customtkinter.CTkToplevel):
 
 
 class BackFillDialog(customtkinter.CTkToplevel):
-    def __init__(self, parent, items: list, on_confirm):
+    def __init__(self, parent, items: list, on_confirm, on_cancel):
         super().__init__(parent)
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._dialog_box_height: int = 420
         self._dialog_box_width: int = 420
 
         self._on_confirm = on_confirm
+        self._on_cancel = on_cancel
         self._items: dict = {}
         self._checked: dict = {}
         self._tree = None
@@ -205,7 +208,7 @@ class BackFillDialog(customtkinter.CTkToplevel):
         self.resizable(False, False)
 
         self.transient(parent)
-        self.grab_set()
+        self.after(100, self.grab_set)
 
     def _add_widgets(self, items: list):
         self.grid_columnconfigure(0, weight=1)
@@ -288,4 +291,8 @@ class BackFillDialog(customtkinter.CTkToplevel):
 
     def _finish(self, selected_ids):
         self._on_confirm(selected_ids)
+        self.destroy()
+
+    def _on_close(self):
+        self._on_cancel()
         self.destroy()
