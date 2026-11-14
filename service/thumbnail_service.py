@@ -21,6 +21,7 @@ class ThumbnailService:
     # Public Methods
     def fetch_async(self, url: str, widget: object, on_ready: Callable):
         if not url:
+            on_ready(None)
             return
         thread = threading.Thread(
             target=self._fetch_and_resize,
