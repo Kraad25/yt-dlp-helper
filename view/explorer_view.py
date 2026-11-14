@@ -3,6 +3,8 @@ import os
 import customtkinter
 from tkinter import filedialog
 
+from yt_dlp.utils import sanitize_filename
+
 from view.BaseView import BaseView
 from view.custom_combobox import CustomComboBox
 from view.custom_dialogbox import AddWatchChannelDialog, BackFillDialog
@@ -193,7 +195,13 @@ class ExplorerView(BaseView):
 
     def _on_add_section_to_watchlist(self):
         base_folder = self._destination_entry.get().strip()
-        default_destination = self._folder_controller.normalize_path(os.path.join(base_folder, self._current_channel_name))
+        safe_name = sanitize_filename(self._current_channel_name or "").strip(" .")
+
+        if base_folder and safe_name:
+            default_destination = self._folder_controller.normalize_path(os.path.join(base_folder, safe_name))
+        else:
+            default_destination = base_folder
+
         AddWatchChannelDialog(
             self,
             channel_name=self._current_channel_name,
@@ -518,7 +526,7 @@ class ExplorerView(BaseView):
         )
         subtitle_label.grid(row=1, column=0, sticky="w")
  
-        if clickable_channel and type != "playlist":
+        if clickable_channel and type != "playlist" and entry.get("channel_url"):
             channel_url = entry.get("channel_url")
             channel_name = entry.get("channel", "")
             subtitle_label.configure(cursor="hand2")
