@@ -24,6 +24,9 @@ class SearchPageService:
     def has_more(self) -> bool:
         return self._unseen_count() > 0 or self._can_fetch_more()
 
+    def return_batch(self, batch: list[dict]):
+        self._shown -= len(batch)
+
     # Private Methods
     def _reset(self, query: str):
         self._query = query
