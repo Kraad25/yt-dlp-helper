@@ -32,6 +32,7 @@ class DownloadJob:
 
     cancel: threading.Event = field(default_factory=threading.Event)
     partial_files: set = field(default_factory=set)
+    finished_files: list = field(default_factory=list)
 
 class DownloadController:    
     def __init__(self):
@@ -101,6 +102,8 @@ class DownloadController:
                 progress_hook=lambda data: self._progress_hook(job, data),
             )
 
+            job.finished_files.extend(downloaded_files)
+
             if not job.cancel.is_set():
                 saved = [file for file in downloaded_files if os.path.exists(file)]
                 if saved:
@@ -127,6 +130,8 @@ class DownloadController:
                 progress_hook=lambda data: self._progress_hook(job, data),
             )
 
+            job.finished_files.extend(downloaded_files)
+
             if not job.cancel.is_set():
                 saved = [file for file in downloaded_files if os.path.exists(file)]
 
@@ -135,7 +140,7 @@ class DownloadController:
                 else:
                     for i, file in enumerate(saved, 1):
                         job.on_status(f"Transcoding {i}/{len(saved)} ...")
-                        self._video_processor.transcode(file, job.encoder)
+                        self._video_processor.transcode(file, job.encoder, job.cancel)
 
                     job.on_status(f"Done: {len(saved)} item downloaded")
 
@@ -149,7 +154,9 @@ class DownloadController:
     def _finish_job(self, job: DownloadJob):
         if job.cancel.is_set():
             self._cleanup_partial_files(job)
+            self._delete_finished_files(job)
             job.on_status("Download cancelled")
+
         job.on_cancel_enabled(False)
         job.on_download_enabled(True)
 
@@ -205,6 +212,11 @@ class DownloadController:
                 self._remove_with_retry(path)
 
         job.partial_files.clear()
+
+    def _delete_finished_files(self, job: DownloadJob):
+        for path in job.finished_files:
+            self._remove_with_retry(path)
+        job.finished_files.clear()
 
     def _remove_with_retry(self, path: str, attempts: int = 5, delay: float = 0.5):
         for _ in range(attempts):

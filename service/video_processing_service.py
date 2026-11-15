@@ -1,5 +1,7 @@
+import os
 import json
-import shutil
+import tempfile
+import threading
 import subprocess
 from pathlib import Path
 
@@ -7,20 +9,20 @@ si = subprocess.STARTUPINFO()
 si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
 class VideoProcessingService:
-    def __init__(self, ffmpeg_dir: Path, encoder: str = 'QSV'):   
+    def __init__(self, ffmpeg_dir: Path):   
         self._ffmpeg_dir = ffmpeg_dir
         self._ffprobe_path = self._ffmpeg_dir / 'ffprobe.exe'
-        self._encoder = encoder # "qsv", "nvenc", "cpu", "amf"
 
-    def transcode(self, input_file: str, encoder: str) -> None:
-        self._encoder = encoder
-        
+    def transcode(self, input_file: str, encoder: str, cancel: threading.Event) -> None:
         try:
+            if cancel.is_set():
+                return
+            
             if self._is_h264_video(input_file):
                 return
             
-            encoder_args = self._build_video_encoder_args()
-            self._transcode_with_encoder(input_file, encoder_args)
+            encoder_args = self._build_video_encoder_args(encoder)
+            self._transcode_with_encoder(input_file, encoder_args, cancel)
 
         except Exception as e:
             raise Exception(f"Transcoding Failed: {e}")
@@ -30,16 +32,17 @@ class VideoProcessingService:
             probe_data = self._probe_video_stream(input_file)
             codec = probe_data['streams'][0].get('codec_name', '')
             return codec == 'h264'
-        except:
+        except Exception:
             return False # Assumes needs transcoding on error
         
-    def _transcode_with_encoder(self, input_file: str, encoder_args: list) -> None:
+    def _transcode_with_encoder(self, input_file: str, encoder_args: list, cancel: threading.Event) -> None:
         input_path = Path(input_file)
         temp_output = input_path.with_stem(f"{input_path.stem}_temp")
 
         cmd = [
             str(self._ffmpeg_dir / "ffmpeg.exe"),
             "-y",
+            "-loglevel", "error",
             "-i", str(input_path),
             "-map", "0:v:0",
             "-map", "0:a:0?",
@@ -49,14 +52,33 @@ class VideoProcessingService:
             str(temp_output),
         ]
 
-        result = subprocess.run(cmd, capture_output=True, startupinfo=si)
+        with tempfile.TemporaryFile() as error_log:
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=error_log,
+                startupinfo=si,
+            )
 
-        if result.returncode != 0:
-            temp_output.unlink(missing_ok=True)
-            raise Exception(f"FFmpeg error: {result.stderr}")
+            while True:
+                try:
+                    process.wait(timeout=0.2)
+                    break
+                except subprocess.TimeoutExpired:
+                    if cancel.is_set():
+                        process.kill()
+                        process.wait()
+                        temp_output.unlink(missing_ok=True)
+                        return
 
-        input_path.unlink()
-        shutil.move(str(temp_output), str(input_path))
+            if process.returncode != 0:
+                error_log.seek(0)
+                message = error_log.read().decode(errors="replace").strip()
+                temp_output.unlink(missing_ok=True)
+                raise Exception(f"FFmpeg error: {message}")
+
+        os.replace(temp_output, input_path)
         
     def _probe_video_stream(self, input_file: str) -> dict:
         cmd = self._build_probe_cmd(input_file)
@@ -77,12 +99,12 @@ class VideoProcessingService:
             input_file
         ]
 
-    def _build_video_encoder_args(self) -> list:
-        if self._encoder == 'QSV': # Intel QSV
+    def _build_video_encoder_args(self, encoder) -> list:
+        if encoder == 'QSV': # Intel QSV
             return ['-c:v', 'h264_qsv', '-preset', 'fast', '-global_quality', '18']
-        elif self._encoder == 'NVENC': # NVIDIA GPU
+        elif encoder == 'NVENC': # NVIDIA GPU
             return ['-c:v', 'h264_nvenc', '-preset', 'fast', '-cq', '18']
-        elif self._encoder == 'AMF': # AMD AMF
+        elif encoder == 'AMF': # AMD AMF
             return [
                 '-c:v', 'h264_amf',
                 '-quality', 'balanced',
