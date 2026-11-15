@@ -159,16 +159,18 @@ class DownloadController:
             if temp:
                 job.partial_files.add(temp)
 
-            total = data.get('total_bytes') or data.get('total_bytes_estimate', 1)
-            downloaded = data.get('downloaded_bytes', 0)
-            percent = int((downloaded / total) * 100)
-
-            job.on_progress(percent)
-            job.on_status(f"Downloading: {percent}%")
-
             if job.cancel.is_set():
                 job.on_cancel_enabled(False)
                 raise DownloadCancelled("Download cancelled by user")
+
+            total = data.get('total_bytes') or data.get('total_bytes_estimate')
+            if total:
+                percent = max(0, min(100, int(data.get('downloaded_bytes', 0) / total * 100)))
+                job.on_progress(percent)
+                job.on_status(f"Downloading: {percent}%")
+            else:
+                job.on_status("Downloading...")
+
 
         elif data['status'] == 'finished':
             job.on_status("Processing file...")
