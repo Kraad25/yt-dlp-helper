@@ -1,13 +1,15 @@
 import customtkinter
 
-class CustomComboBox:    
+class QualitySelector:
+    
+    MP3 = 1
+    MP4 = 2
 
     AUDIO_QUALITIES = ["128 kbps", "192 kbps", "256 kbps", "320 kbps"]
     VIDEO_QUALITIES = ["360p", "480p", "720p", "1080p", "2K", "4K"]
 
-    def __init__(self, parent, mode_var, width: int = 140):
+    def __init__(self, parent, width: int = 140):
         self._parent = parent
-        self._mode_var = mode_var
         self._var = customtkinter.StringVar(value=self.AUDIO_QUALITIES[1])
 
         self.widget = customtkinter.CTkOptionMenu(

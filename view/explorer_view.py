@@ -7,16 +7,12 @@ import customtkinter
 
 from yt_dlp.utils import sanitize_filename
 
-from view.BaseView import BaseView
-from view.custom_combobox import CustomComboBox
+from view.base_view import BaseView
+from view.quality_selector import QualitySelector
 from view.custom_dialogbox import AddWatchChannelDialog, BackFillDialog
 
 from controller.folder_controller import FolderController
 from controller.explore_controller import ExploreController
-
-class Mode:
-    MP3 = 1
-    MP4 = 2
 
 class ViewMode:
     SEARCH = "search"
@@ -34,7 +30,7 @@ class ExplorerView(BaseView):
     ROW_STATUS = 5
 
     def __init__(self, parent):
-        self._mode_var = customtkinter.IntVar(value=Mode.MP3)
+        self._mode_var = customtkinter.IntVar(value=QualitySelector.MP3)
         self._seg_button_var = customtkinter.StringVar(value="🎵 Mp3")
 
         self._destination_entry = None
@@ -94,7 +90,7 @@ class ExplorerView(BaseView):
         self._folder_controller.store_destination_path(selected)
 
     def _on_segmented_change(self, value):
-        self._mode_var.set(Mode.MP3 if "Mp3" in value else Mode.MP4)
+        self._mode_var.set(QualitySelector.MP3 if "Mp3" in value else QualitySelector.MP4)
         self._on_mode_change()
 
     def _on_show_more_clicked(self):
@@ -186,7 +182,7 @@ class ExplorerView(BaseView):
             self.update_status("Set a destination folder first.")
             return
 
-        mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
+        mode = "mp3" if self._mode_var.get() == QualitySelector.MP3 else "mp4"
         quality = self._quality_selector.get_value()
         url = item_data.get("url")
         title = item_data.get("title", "this video")
@@ -233,7 +229,7 @@ class ExplorerView(BaseView):
 
     # Private Methods
     def _setup_style(self):
-        pass # CTk widgets are themed via themes/warm_refined.json
+        pass # CTk widgets are themed via custom_themes/warm_refined.json
 
     def _create_widgets(self):
         self.grid_columnconfigure(0, weight=0)
@@ -355,7 +351,7 @@ class ExplorerView(BaseView):
         quality_label = customtkinter.CTkLabel(group, text="Quality", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
         quality_label.grid(row=0, column=1, sticky="e", padx=(30, 0))
 
-        quality_selector = CustomComboBox(group, self._mode_var, width=130)
+        quality_selector = QualitySelector(group, width=130)
         quality_selector.widget.grid(row=0, column=2, sticky="w", padx=(15, 0))
 
         return segmented_button, quality_selector
@@ -433,7 +429,7 @@ class ExplorerView(BaseView):
 
     ## Helper Functions
     def _on_mode_change(self):
-        mode = "mp3" if self._mode_var.get() == Mode.MP3 else "mp4"
+        mode = "mp3" if self._mode_var.get() == QualitySelector.MP3 else "mp4"
         self._quality_selector.switch_mode(mode)
 
     def _on_search_error(self, error_message: str):
