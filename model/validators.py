@@ -2,21 +2,35 @@ import os
 from urllib.parse import urlparse
 
 class DownloadValidator:
-    SUPPORTED_MODES = {'mp3', 'mp4'}
+    SUPPORTED_MODES = ('mp3', 'mp4')
     ERROR_MESSAGES = {
         'url_missing': "Error: URL missing",
+        'url_invalid': "Error: Enter a valid http(s) link",
+        'path_missing': "Error: Choose a destination folder",
         'unsupported_mode': "Error: Unsupported mode. Supported: {}"
     }
 
     @staticmethod
-    def validate(url, mode):
+    def validate(url, mode, path):
         if not url:
             return DownloadValidator.ERROR_MESSAGES['url_missing']
-
+        if not DownloadValidator._is_url(url):
+            return DownloadValidator.ERROR_MESSAGES['url_invalid']
+        if not path or not path.strip():
+            return DownloadValidator.ERROR_MESSAGES['path_missing']
         if mode not in DownloadValidator.SUPPORTED_MODES:
             modes_str = ", ".join(DownloadValidator.SUPPORTED_MODES)
             return DownloadValidator.ERROR_MESSAGES['unsupported_mode'].format(modes_str)
         return None
+
+    @staticmethod
+    def _is_url(url):
+        try:
+            parsed = urlparse(url.strip())
+        except (AttributeError, ValueError):
+            return False
+        
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
     
 class FolderValidator:
     @staticmethod
@@ -33,7 +47,7 @@ class WatcherValidator:
     ERROR_MESSAGES = {
         'url_missing': "Section URL must be an https YouTube link",
         'empty_display_name': "Provide a section/display name",
-        'empty_destination_path': "Destination's parent folder must exist",
+        'parent_folder_missing': "Destination's parent folder must exist",
         'wrong_type': "Poll interval must be a whole number, at least 15",
     }
     
@@ -44,7 +58,7 @@ class WatcherValidator:
         if not WatcherValidator._has_section_name(section_info["section_name"]):
             return WatcherValidator.ERROR_MESSAGES['empty_display_name']
         if not WatcherValidator._has_destination_path(section_info["destination_path"]):
-            return WatcherValidator.ERROR_MESSAGES['empty_destination_path']
+            return WatcherValidator.ERROR_MESSAGES['parent_folder_missing']
         if not WatcherValidator._is_poll_interval_int(section_info["poll_interval"]):
             return WatcherValidator.ERROR_MESSAGES['wrong_type']
 
@@ -55,7 +69,7 @@ class WatcherValidator:
         if not WatcherValidator._has_section_name(display_name):
             return WatcherValidator.ERROR_MESSAGES['empty_display_name']
         if not WatcherValidator._has_destination_path(destination):
-            return WatcherValidator.ERROR_MESSAGES['empty_destination_path']
+            return WatcherValidator.ERROR_MESSAGES['parent_folder_missing']
         if poll_interval is not None and not WatcherValidator._is_poll_interval_int(poll_interval):
             return WatcherValidator.ERROR_MESSAGES['wrong_type']
         return None
@@ -67,7 +81,7 @@ class WatcherValidator:
         except (AttributeError, ValueError):
             return False
         
-        return parsed.scheme == "https" and parsed.hostname in ("youtube.com", "www.youtube.com")
+        return parsed.scheme == "https" and parsed.hostname in ("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com")
 
     @staticmethod
     def _has_section_name(name) -> bool:

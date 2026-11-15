@@ -84,10 +84,17 @@ class DownloadController:
 
     # Private Methods
     def _validate_data(self, job: DownloadJob) -> bool:
-        custom_error_msg = DownloadValidator.validate(job.url, job.mode)
+        custom_error_msg = DownloadValidator.validate(job.url, job.mode, job.out_dir)
         if custom_error_msg:            
             job.on_status(custom_error_msg)
             return False
+
+        try:
+            os.makedirs(job.out_dir, exist_ok=True)
+        except OSError:
+            job.on_status("Error: Can't use that folder")
+            return False
+        
         return True
     
     def _run_audio_download(self, job: DownloadJob):
