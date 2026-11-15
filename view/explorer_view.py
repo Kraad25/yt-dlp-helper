@@ -189,10 +189,13 @@ class ExplorerView(BaseView):
         encoder = self._video_encoder
 
         self.update_status(f"Downloading: {title}")
-        self._explore_controller.download(
+        job = self._explore_controller.download(
             url, mode, quality, base_path, encoder,
             update_status=self._thread_dispatcher.wrap(self.update_status),
         )
+
+        if job:
+            self._folder_controller.store_destination_path(base_path)
 
     def _on_add_section_to_watchlist(self):
         base_folder = self._destination_entry.get().strip()

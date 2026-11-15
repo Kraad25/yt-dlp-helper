@@ -97,6 +97,9 @@ class HomeView(BaseView):
             self._thread_dispatcher.wrap(self.update_status),
         )
 
+        if self._current_job:
+            self._folder_controller.store_destination_path(path)
+
     def _on_browse_clicked(self):
         selected = filedialog.askdirectory(initialdir=self._folder_controller.get_base_directory())
         self._folder_controller.store_destination_path(selected)

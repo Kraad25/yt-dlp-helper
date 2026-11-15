@@ -28,11 +28,16 @@ class FolderController:
         self._notify_listeners(selected)
     
     def normalize_path(self, path: str) -> str:
-        return (path or "").strip().replace("\\", "/")
+        path = (path or "").strip()
+        if path.startswith("\\\\"):
+            return path
+        return path.replace("\\", "/")
 
     # Private Methods
     def _default_directory(self) -> str:
-        return os.path.expanduser("~/Documents").replace("\\", "/")
+        documents = os.path.expanduser("~/Documents")
+        base = documents if os.path.isdir(documents) else os.path.expanduser("~")
+        return base.replace("\\", "/")
 
     def _notify_listeners(self, path: str):
         for callback in self._listeners:
