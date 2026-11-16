@@ -75,13 +75,22 @@ class UpdateService:
             return None
 
         update_status(f"yt-dlp {latest} available (you have {installed}), updating...")
-        python = str(self._python_exe) if self._python_exe.exists() else sys.executable
+
+        if self._python_exe.exists():
+            python = str(self._python_exe)
+        elif getattr(sys, "frozen", False):
+            update_status("Updater unavailable: python-embed not found")
+            return None
+        else:
+            python = sys.executable
 
         try:
             result = subprocess.run(
-                [python, "-m", "pip", "install", "--upgrade",
-                "--target", str(self._libs_dir), "yt-dlp"],
-                capture_output=True, text=True,
+                [
+                    python, "-m", "pip", "install", "--upgrade",
+                    "--target", str(self._libs_dir), "yt-dlp"
+                ], 
+                capture_output=True, text=True, timeout=300,
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
             )
             if result.returncode != 0:
@@ -89,6 +98,10 @@ class UpdateService:
                 update_status(f"yt-dlp update failed: {last_line}")
                 return None
             return f"yt-dlp updated to {latest}, restart to use it"
+
+        except subprocess.TimeoutExpired:
+            update_status("yt-dlp update timed out")
+            return None
         except Exception as e:
             update_status(f"yt-dlp update failed: {e}")
             return None
