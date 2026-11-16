@@ -72,8 +72,8 @@ class ExploreController:
     def cancel_active_request(self):
         self._active_cancel.set()
 
-    def get_thumbnail(self, thumbnail_url: str, widget: object, on_ready: Callable):
-        self._thumbnail_service.fetch_async(thumbnail_url, widget, on_ready)    
+    def get_thumbnail(self, thumbnail_url: str, on_ready: Callable):
+        self._thumbnail_service.fetch_async(thumbnail_url, on_ready)    
 
     def get_playlist_cover(self, playlist_url: str, on_ready: Callable):
         cached = self._cover_cache.get(playlist_url)

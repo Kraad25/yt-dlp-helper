@@ -1,13 +1,19 @@
+import os
 import io
 import hashlib
 import threading
 import urllib.request
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Callable
+from concurrent.futures import ThreadPoolExecutor
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from core.paths import user_data_dir
+
+TOTAL_CACHE_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
+MAX_WORKERS = 4
 
 class ThumbnailService:
     def __init__(self, width: int = 160, height: int = 90):
@@ -18,30 +24,46 @@ class ThumbnailService:
         cache_dir.mkdir(parents=True, exist_ok=True)
         self._cache_dir = cache_dir
 
+        self._pool = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+        self._lock = threading.Lock()
+        self._waiting: dict[str, list[Callable]] = {}
+
+        self._trim_cache()
+
     # Public Methods
-    def fetch_async(self, url: str, widget: object, on_ready: Callable):
+    def fetch_async(self, url: str, on_ready: Callable):    
         if not url:
             on_ready(None)
             return
-        thread = threading.Thread(
-            target=self._fetch_and_resize,
-            args=(url, widget, on_ready),
-            daemon=True,
-        )
-        thread.start()
+
+        with self._lock:
+            if url in self._waiting:
+                self._waiting[url].append(on_ready)
+                return
+            self._waiting[url] = [on_ready]
+
+        self._pool.submit(self._fetch_and_resize, url)
 
     # Private Methods
-    def _fetch_and_resize(self, url: str, widget: object, on_ready: Callable):
+    def _fetch_and_resize(self, url: str):
+        image = None
         try:
             image = self._load_from_cache(url)
             if image is None:
                 image = self._download(url)
                 self._save_to_cache(url, image)
-
-            image = image.resize((self._width, self._height))
-            on_ready(image)
+            image = ImageOps.fit(image, (self._width, self._height))
         except Exception:
-            on_ready(image)
+            image = None
+
+        with self._lock:
+            callbacks = self._waiting.pop(url, [])
+
+        for callback in callbacks:
+            try:
+                callback(image)
+            except Exception:
+                pass
 
     def _cache_path(self, url: str) -> Path:
         key = hashlib.sha256(url.encode("utf-8")).hexdigest()
@@ -51,12 +73,16 @@ class ThumbnailService:
         path = self._cache_path(url)
         if not path.exists():
             return None
-        try:
-            return Image.open(path).convert("RGB")
+        try:            
+            image = Image.open(path).convert("RGB")
+            os.utime(path)
+            return image
         except Exception:
             return None
 
     def _download(self, url: str):
+        if urlparse(url).scheme != "https":
+            raise ValueError("Only https thumbnails are allowed")
         with urllib.request.urlopen(url, timeout=5) as response:
             raw = response.read()
         return Image.open(io.BytesIO(raw)).convert("RGB")
@@ -65,4 +91,16 @@ class ThumbnailService:
         try:
             image.save(self._cache_path(url), format="JPEG")
         except Exception:
+            pass
+
+    def _trim_cache(self):
+        try:
+            files = [(p, p.stat()) for p in self._cache_dir.glob("*.jpg")]
+            total = sum(stat.st_size for _, stat in files)
+            for path, stat in sorted(files, key=lambda item: item[1].st_mtime):
+                if total <= TOTAL_CACHE_MAX_BYTES:
+                    break
+                path.unlink(missing_ok=True)
+                total -= stat.st_size
+        except OSError:
             pass

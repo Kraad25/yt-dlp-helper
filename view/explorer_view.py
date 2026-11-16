@@ -462,7 +462,7 @@ class ExplorerView(BaseView):
 
     def _load_thumbnail(self, label, thumbnail_url, generation: int):
         self._explore_controller.get_thumbnail(
-            thumbnail_url, self,
+            thumbnail_url,
             lambda image, lbl=label, gen=generation:
                 self._thread_dispatcher.post(self._apply_thumbnail, lbl, image, gen),
         )
