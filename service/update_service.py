@@ -1,5 +1,6 @@
-import re
+import os
 import sys
+import re
 import subprocess
 import zipfile
 import shutil
@@ -20,6 +21,8 @@ class UpdateService:
         self._ffmpeg_dir = ffmpeg_directory()
 
         self._PYPI_URL = "https://pypi.org/pypi/yt-dlp/json"
+        self._FFMPEG_API_URL = "https://api.github.com/repos/yt-dlp/FFmpeg-Builds/releases/latest"
+        self._FFMPEG_ASSET = "ffmpeg-master-latest-win64-gpl.zip"
 
 
     # Public
@@ -56,6 +59,21 @@ class UpdateService:
             text = (self._libs_dir / "yt_dlp" / "version.py").read_text()
             match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
             return match.group(1) if match else None
+        except OSError:
+            return None
+
+    def _get_latest_ffmpeg_stamp(self) -> str:
+        request = urllib.request.Request(
+            self._FFMPEG_API_URL, headers={"User-Agent": "MediaDownloader"}
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            assets = json.load(response)["assets"]
+        asset = next(a for a in assets if a["name"] == self._FFMPEG_ASSET)
+        return asset["updated_at"]
+
+    def _get_installed_ffmpeg_stamp(self) -> str | None:
+        try:
+            return (self._ffmpeg_dir / "ffmpeg_build.txt").read_text().strip()
         except OSError:
             return None
     
@@ -108,11 +126,23 @@ class UpdateService:
         
     def _update_ffmpeg(self, update_status: Callable) -> str | None:
         update_status("Checking for ffmpeg updates")
-        download_url = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+
+        try:
+            latest_stamp = self._get_latest_ffmpeg_stamp()
+        except Exception as e:
+            update_status(f"Couldn't check for ffmpeg updates: {e}")
+            return None
+
+        if latest_stamp == self._get_installed_ffmpeg_stamp():
+            return "ffmpeg is up to date"
+
+        update_status("Downloading new ffmpeg build...")
+        download_url = f"https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/{self._FFMPEG_ASSET}"
         tmp_zip = self._app_root / "ffmpeg_update.zip"
 
         try:
-            urllib.request.urlretrieve(download_url, tmp_zip)
+            with urllib.request.urlopen(download_url, timeout=30) as response, open(tmp_zip, "wb") as out:
+                shutil.copyfileobj(response, out)
 
             with zipfile.ZipFile(tmp_zip, "r") as zf:
                 names = zf.namelist()
@@ -130,6 +160,7 @@ class UpdateService:
                         shutil.copyfileobj(src, dst)
 
             tmp_zip.unlink()
+            (self._ffmpeg_dir / "ffmpeg_build.txt").write_text(latest_stamp)
             return "ffmpeg re-downloaded"
         
         except Exception as e:
