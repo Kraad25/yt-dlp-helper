@@ -180,11 +180,13 @@ class YoutubeService:
                 continue
  
             if 'playlist?list=' in entry_url:
+                thumbnails = entry.get('thumbnails') or []
+                thumb_url = thumbnails[-1]['url'] if thumbnails else None
                 results.append({
                     'type': 'playlist',
                     'id': entry_id,
                     'title': entry.get('title', 'Untitled'),
-                    'thumbnail_url': None,
+                    'thumbnail_url': thumb_url,
                     'url': entry_url,
                 })
             else:
