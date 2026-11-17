@@ -1,21 +1,23 @@
-import yt_dlp
 import os
 from pathlib import Path
+
+import yt_dlp
+from yt_dlp.utils import DownloadError
 
 SECTION_INDEX_LIMIT = 500
 _FILE_HOOK_PP = 'MoveFiles'
 
 class YoutubeService:
-    def __init__(self, ffmpeg_dir: Path= None):
-        self._ffmpeg_dir = ffmpeg_dir
-
-        self._POSSIBLE_CHANNEL_SECTIONS = [
+    _POSSIBLE_CHANNEL_SECTIONS = [
         ("Videos", "videos"),
         ("Shorts", "shorts"),
         ("Live", "streams"),
         ("Releases", "releases"),
         ("Playlists", "playlists"),
     ]
+
+    def __init__(self, ffmpeg_dir: Path|None = None):
+        self._ffmpeg_dir = ffmpeg_dir
 
     # Public Methods
     def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None):
@@ -162,7 +164,13 @@ class YoutubeService:
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(section_url, download=False)
+            try:
+                info = ydl.extract_info(section_url, download=False)
+            except DownloadError as e:
+                if "does not have a" in str(e):
+                    tab = section_url.rstrip("/").rsplit("/", 1)[-1]
+                    raise RuntimeError(f"This channel has no {tab} tab") from e
+                raise
  
         results = []
         for entry in (info.get('entries') or []):
