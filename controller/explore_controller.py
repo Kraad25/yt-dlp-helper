@@ -4,7 +4,6 @@ from typing import Callable
 
 from controller.download_controller import DownloadController
 
-from model.watcher_db_model import initilize_database
 from model.validators import WatcherValidator
 
 from service.youtube_service import YoutubeService, SECTION_INDEX_LIMIT
@@ -24,8 +23,6 @@ SECTION_BATCH_SIZE = 20
 class ExploreController:
     def __init__(self, download_controller: DownloadController):
         ffmpeg_dir = ffmpeg_directory()
-
-        initilize_database()
 
         self._youtube_service = YoutubeService(ffmpeg_dir)
         self._thumbnail_service = ThumbnailService()

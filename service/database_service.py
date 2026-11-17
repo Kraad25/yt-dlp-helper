@@ -27,7 +27,7 @@ def add_watch_with_items(section_info: dict, items: list[dict]):
             connection.execute(
                 """
                 INSERT INTO watch_list
-                    (section_url, section_name, destination_path, auto_download, is_active, poll_interval)
+                    (section_url, section_name, destination_path, auto_download, is_active, poll_interval_min)
                 VALUES (?, ?, ?, ?, 1, ?)
                 """,
                 (section_url, section_info["section_name"], section_info["destination_path"],
@@ -64,10 +64,10 @@ def get_active_or_paused_watch_list(is_active: bool) -> list[dict]:
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
-def get_poll_intervals() -> list[dict]:
+def get_poll_interval_mins() -> list[dict]:
     with db_transaction() as connection:
         rows = connection.execute(
-            "SELECT section_url, poll_interval FROM watch_list WHERE is_active = TRUE"
+            "SELECT section_url, poll_interval_min FROM watch_list WHERE is_active = TRUE"
         ).fetchall()
         return [dict(row) for row in rows]
 
@@ -97,11 +97,11 @@ def set_watch_active(section_url: str, is_active: bool):
             "UPDATE watch_list SET is_active = ? WHERE section_url = ?", (is_active, _clean_url(section_url)),
         )
 
-
-def set_item_status(item_id: str, status: str):
+def set_item_status(section_url: str, item_id: str, status: str):
     with db_transaction() as connection:
         connection.execute(
-            "UPDATE items SET item_status = ? WHERE item_id = ?", (status, item_id),
+            "UPDATE items SET item_status = ? WHERE section_url = ? AND item_id = ?",
+            (status, _clean_url(section_url), item_id),
         )
 
 # Private Methods

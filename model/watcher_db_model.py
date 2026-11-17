@@ -4,45 +4,53 @@ from contextlib import contextmanager
 from core.paths import user_data_dir
 
 WATCHER_DB_PATH = user_data_dir() / "database" / "watcher.db"
-WATCHER_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+SCHEMA_VERSION = 1
 
 def get_database_connection():
-    connection = sqlite3.connect(WATCHER_DB_PATH)
+    connection = sqlite3.connect(WATCHER_DB_PATH, timeout=15)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON;")
     return connection
 
-def initilize_database():
+def initialize_database():
+    WATCHER_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     connection = get_database_connection()
-    cursor = connection.cursor()
+    try:
+        connection.execute("PRAGMA journal_mode=WAL;")
+    finally:
+        connection.close()
 
-    connection.execute("PRAGMA foreign_keys = ON;")
+    with db_transaction() as connection:
+        connection.execute("BEGIN")
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS watch_list(
-            section_url TEXT PRIMARY KEY NOT NULL,
-            section_name TEXT NOT NULL,
-            destination_path TEXT NOT NULL,
-            auto_download BOOLEAN NOT NULL DEFAULT FALSE,
-            is_active BOOLEAN NOT NULL DEFAULT TRUE,
-            poll_interval INTEGER NOT NULL
-        )
-    """)
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS items(
-            item_id TEXT PRIMARY KEY NOT NULL,
-            title TEXT NOT NULL,
-            url TEXT NOT NULL,
-            item_status TEXT NOT NULL,
-            thumbnail_url TEXT,
-            section_url TEXT NOT NULL,
-            FOREIGN KEY (section_url) REFERENCES watch_list(section_url) ON DELETE CASCADE
-        )
-    """)
-
-    connection.commit()
-    connection.close()
+        if version < 1:
+            connection.execute("""
+                CREATE TABLE watch_list(
+                    section_url TEXT PRIMARY KEY NOT NULL,
+                    section_name TEXT NOT NULL,
+                    destination_path TEXT NOT NULL,
+                    auto_download BOOLEAN NOT NULL DEFAULT FALSE,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    poll_interval_min INTEGER NOT NULL
+                )
+            """)
+            connection.execute("""
+                CREATE TABLE items(
+                    item_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    item_status TEXT NOT NULL
+                        CHECK (item_status IN ('new','queued','downloaded','ignored','removed_upstream')),
+                    thumbnail_url TEXT,
+                    section_url TEXT NOT NULL,
+                    PRIMARY KEY (section_url, item_id),
+                    FOREIGN KEY (section_url) REFERENCES watch_list(section_url) ON DELETE CASCADE
+                )
+            """)
+            connection.execute("PRAGMA user_version = 1")
 
 @contextmanager
 def db_transaction():

@@ -32,6 +32,8 @@ from controller.explore_controller import ExploreController
 from service.update_service import UpdateService
 from service.encoder_test_service import EncoderTestService
 
+from model.watcher_db_model import initialize_database
+
 VERSION = "1.3.0"
 
 # Locked for now
@@ -65,6 +67,7 @@ class App:
 
         self._encoder_var = tk.StringVar(value="CPU")
 
+        initialize_database()
         self._setup()
 
     def run(self):
@@ -73,7 +76,7 @@ class App:
     def _setup(self):
         self._setup_window()
         self._create_menu_bar()
-        self._initialize_views()
+        self._initialize_views()        
         self._initialize_controllers()
         self._wire_controllers_to_views()
         self._show_home()
