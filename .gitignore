@@ -21,12 +21,16 @@
 *.tcl
 *.enc
 *.msg
-*.dbA
+*.db
+*.db-wal
+*.db-shm
 dist/
 libs/
 python-embed/
 data/
 config/
+__pycache__/
+.venv/
 
 get-pip.py
 !requirements.txt
