@@ -23,10 +23,13 @@ class YoutubeService:
         downloaded_files = []
 
         ydl_opts = {
-            'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
+            'outtmpl': os.path.join(out_dir, '%(title).150B.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
             'ignoreerrors': True,
+            'socket_timeout': 15,
+            'retries': 3,
+            'fragment_retries': 3,
             'format': 'bestaudio/best',
             'ffmpeg_location': str(self._ffmpeg_dir),
             'postprocessors': [
@@ -63,12 +66,16 @@ class YoutubeService:
         height = quality_map.get(quality, 720)
         
         ydl_opts = {
-            'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
+            'outtmpl': os.path.join(out_dir, '%(title).150B.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
             'ignoreerrors': True,
+            'socket_timeout': 15,
+            'retries': 3,
+            'fragment_retries': 3,
             'ffmpeg_location': str(self._ffmpeg_dir),
-            'format': f'bestvideo[ext=mp4][height<={height}]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': f'bv*[height<={height}]+ba/b[height<={height}]',
+            'format_sort': ['res', 'vcodec:h264', 'acodec:m4a'],
             'merge_output_format': 'mp4',
             'postprocessors': [
                 {'key': 'FFmpegMetadata'},
@@ -89,6 +96,7 @@ class YoutubeService:
             'no_warnings': True,
             'extract_flat': True,
             'skip_download': True,
+            'socket_timeout': 15,
         }
  
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -122,6 +130,7 @@ class YoutubeService:
             'extract_flat': True,
             'skip_download': True,
             'playlistend': 1,
+            'socket_timeout': 15,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -149,6 +158,7 @@ class YoutubeService:
             'extract_flat': True,
             'skip_download': True,
             'playlist_items': f"{start}-{end}",
+            'socket_timeout': 15,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -196,6 +206,7 @@ class YoutubeService:
             'extract_flat': True,
             'skip_download': True,
             'playlist_items': f"1-{max_items}",
+            'socket_timeout': 15,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -234,6 +245,7 @@ class YoutubeService:
             'extract_flat': True,
             'skip_download': True,
             'playlistend': 1,   # <- only want the first track
+            'socket_timeout': 15,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
