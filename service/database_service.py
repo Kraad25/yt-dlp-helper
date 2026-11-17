@@ -2,6 +2,7 @@ import sqlite3
 from model.watcher_db_model import db_transaction
 
 ITEM_STATUS_NEW = "new"
+ITEM_STATUS_QUEUED = "queued"
 ITEM_STATUS_DOWNLOADED = "downloaded"
 ITEM_STATUS_IGNORED = "ignored"
 ITEM_STATUS_REMOVED_UPSTREAM = "removed_upstream"
@@ -75,7 +76,7 @@ def get_items_by_section(section_url: str) -> list[dict]:
         cursor = connection.cursor()
 
         cursor.execute(
-            "SELECT * FROM items WHERE section_url = ?", (section_url,)
+            "SELECT * FROM items WHERE section_url = ?", (_clean_url(section_url),)
         )
 
         rows = cursor.fetchall()

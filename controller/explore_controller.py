@@ -10,7 +10,10 @@ from model.validators import WatcherValidator
 from service.youtube_service import YoutubeService, SECTION_INDEX_LIMIT
 from service.thumbnail_service import ThumbnailService
 from service.search_page_service import SearchPageService
-from service.database_service import add_watch_with_items, is_watching, get_active_or_paused_watch_list
+from service.database_service import (
+    add_watch_with_items, is_watching, get_active_or_paused_watch_list,
+    ITEM_STATUS_IGNORED, ITEM_STATUS_QUEUED,
+)
 
 from core.paths import ffmpeg_directory
 
@@ -115,7 +118,7 @@ class ExploreController:
             return "Nothing to save"
 
         for item in self._pending_items:
-            item["status"] = "queued" if item["id"] in ticked_ids else "ignored"
+            item["status"] = ITEM_STATUS_QUEUED if item["id"] in ticked_ids else ITEM_STATUS_IGNORED
 
         error = self._save_watch(self._pending_watch, self._pending_items)
 
