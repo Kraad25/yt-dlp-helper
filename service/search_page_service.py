@@ -50,8 +50,14 @@ class SearchPageService:
     def _load(self, limit: int) -> list[dict]:
         self._fetch_limit = limit
         known_ids = {item["id"] for item in self._cache}
-        fresh = [item for item in self._fetch(self._query, limit) if item["id"] not in known_ids]
+        raw = self._fetch(self._query, limit)
+
+        if len(raw) < limit:
+            self._exhausted = True
+
+        fresh = [item for item in raw if item["id"] not in known_ids]
         self._cache.extend(fresh)
+        
         return fresh
 
     def _take_next_batch(self) -> list[dict]:
