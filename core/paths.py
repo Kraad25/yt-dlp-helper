@@ -1,5 +1,5 @@
-import os, sys
-import shutil
+import os
+import sys
 from pathlib import Path
 
 APP_NAME = "MediaDownloader"
@@ -21,11 +21,3 @@ def ffmpeg_directory() -> Path:
     if getattr(sys, "frozen", False):
         return install_dir() / "_internal" / "ffmpeg"
     return install_dir() / "ffmpeg"
-
-def migrate_legacy_data():
-    target = user_data_dir()
-    for old_root in {install_dir(), resource_dir()}:
-        for name in ("config", "database"):
-            src, dst = old_root / name, target / name
-            if src.is_dir() and not dst.exists():
-                shutil.copytree(src, dst)

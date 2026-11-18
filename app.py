@@ -1,7 +1,12 @@
 import sys
+import logging
 from pathlib import Path
 
-from core.paths import migrate_legacy_data
+from core.app_logger import AppLogger
+
+app_logger = AppLogger()
+app_logger.setup_logging()
+app_logger.install_crash_handlers()
 
 def _bootstrap_libs_path():
     if getattr(sys, "frozen", False):
@@ -12,7 +17,6 @@ def _bootstrap_libs_path():
     sys.path.insert(0, str(libs_dir))
 
 _bootstrap_libs_path()
-migrate_legacy_data()
 
 import tkinter as tk
 from tkinter import messagebox
@@ -50,6 +54,10 @@ class App:
         AppTheme.apply_global_theme()
 
         self.root = ctk.CTk()
+
+        app_logger.install_tk_crash_handler(self.root)
+        logging.getLogger("app").info("app start version=%s frozen=%s", VERSION, getattr(sys, "frozen", False))
+
         self._thread_dispatcher: UiThreadDispatcher = UiThreadDispatcher(self.root)
 
         self._home_view: HomeView = None
