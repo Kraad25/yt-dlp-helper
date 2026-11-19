@@ -235,6 +235,9 @@ class DownloadController:
 
     def _cleanup_partial_files(self, job: DownloadJob):
         gc.collect()
+        removed = 0
+        failed = 0
+
         for temp in job.partial_files:
             base = temp[:-5] if temp.endswith(".part") else temp
             targets = [
@@ -243,25 +246,43 @@ class DownloadController:
                 *glob.glob(glob.escape(temp) + "-Frag*"),
             ]
             for path in targets:
-                self._remove_with_retry(path)
+                if not os.path.exists(path):
+                    continue
+                if self._remove_with_retry(path, job):
+                    removed += 1
+                else:
+                    failed += 1
 
+        job.log.info("Cleanup Partial Files Removed=%s Failed=%s", removed, failed)
         job.partial_files.clear()
 
     def _delete_finished_files(self, job: DownloadJob):
+        removed = 0
+        failed = 0
         for path in job.finished_files:
-            self._remove_with_retry(path)
+            if not os.path.exists(path):
+                continue
+            if self._remove_with_retry(path, job):
+                removed += 1
+            else:
+                failed += 1
+
+        job.log.info("Cleanup Completed Files Removed=%s Failed=%s", removed, failed)
         job.finished_files.clear()
 
-    def _remove_with_retry(self, path: str, attempts: int = 5, delay: float = 0.5):
+    def _remove_with_retry(self, path: str, job: DownloadJob, attempts: int = 5, delay: float = 0.5):
         for _ in range(attempts):
             try:
-                if os.path.exists(path):
-                    os.remove(path)
-                return
+                os.remove(path)
+                return True
             except PermissionError:
                 time.sleep(delay)
-            except Exception:
-                return
+            except Exception as e:
+                job.log.warning('File Removal Failed Path=%s Error="%s"', path, e)
+                return False
+
+        job.log.warning("File Removal failed Path=%s Error:File stayed locked after %s tries", path, attempts)
+        return False
 
     def _normalize_url(self, url: str) -> str:
         query = parse_qs(urlparse(url).query)
