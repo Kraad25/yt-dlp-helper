@@ -7,7 +7,7 @@ from core.paths import user_data_dir
 
 class AppLogger:
         
-    LOG_FORMAT = "%(asctime)s %(levelname)s [%(threadName)s] %(message)s"
+    LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
     MAX_BYTES = 2_000_000
     BACKUP_COUNT = 1

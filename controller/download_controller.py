@@ -16,6 +16,7 @@ from service.error_service import ErrorHandlingService
 from service.video_processing_service import VideoProcessingService
 
 from core.paths import ffmpeg_directory
+from core.job_logger import JobLogger, job_ids
 
 @dataclass
 class DownloadJob:
@@ -24,6 +25,7 @@ class DownloadJob:
     quality: str
     out_dir: str
     encoder: str
+    log: JobLogger
 
     on_status: Callable[[str], None]
     on_progress: Callable[[int], None] = lambda percent: None
@@ -51,7 +53,8 @@ class DownloadController:
             enable_download: Callable,
             enable_cancel: Callable,
             update_progress: Callable, 
-            update_status: Callable
+            update_status: Callable,
+            kind: str = "dl"
     ) -> DownloadJob | None:
 
         job = DownloadJob(
@@ -60,10 +63,16 @@ class DownloadController:
             quality=data.get("quality", ""),
             out_dir=path,
             encoder=encoder,
+            log=JobLogger(job_ids.next_id(kind)),
             on_status=update_status,
             on_progress=update_progress,
             on_download_enabled=enable_download,
             on_cancel_enabled=enable_cancel,
+        )
+
+        job.log.info(
+            "Start Url=%s Mode=%s Quality=%s Encoder=%s out_dir=%s",
+            job.url, job.mode, job.quality, job.encoder, job.out_dir,
         )
 
         if not self._validate_data(job):
@@ -80,18 +89,21 @@ class DownloadController:
 
     def cancel_download(self, job: DownloadJob):
         job.cancel.set()
+        job.log.info("Cancel Requested")
         job.on_status("Cancellation requested.....")
 
     # Private Methods
     def _validate_data(self, job: DownloadJob) -> bool:
         custom_error_msg = DownloadValidator.validate(job.url, job.mode, job.out_dir)
-        if custom_error_msg:            
+        if custom_error_msg:
+            job.log.info('Input Validation Failed:-"%s"', custom_error_msg)            
             job.on_status(custom_error_msg)
             return False
 
         try:
             os.makedirs(job.out_dir, exist_ok=True)
-        except OSError:
+        except OSError as e:
+            job.log.warning('out_dir Failure:-%s error="%s"', job.out_dir, e)            
             job.on_status("Error: Can't use that folder")
             return False
         
@@ -99,8 +111,7 @@ class DownloadController:
     
     def _run_audio_download(self, job: DownloadJob):
         try:
-            url = self._normalize_url(job.url)
-            folder_path = self._resolve_target_dir(url, job.out_dir)
+            url, folder_path = self._prepare_target(job)
 
             downloaded_files = self._youtube_service.audio_download(
                 url=url,
@@ -127,8 +138,7 @@ class DownloadController:
 
     def _run_video_download(self, job: DownloadJob):
         try:
-            url = self._normalize_url(job.url)
-            folder_path = self._resolve_target_dir(url, job.out_dir)
+            url, folder_path = self._prepare_target(job)
 
             downloaded_files = self._youtube_service.video_download(
                 url=url,
@@ -159,10 +169,14 @@ class DownloadController:
             self._finish_job(job)
 
     def _finish_job(self, job: DownloadJob):
-        if job.cancel.is_set():
+        cancelled = job.cancel.is_set()
+        if cancelled:
             self._cleanup_partial_files(job)
             self._delete_finished_files(job)
             job.on_status("Download cancelled")
+
+        saved = sum(1 for path in job.finished_files if os.path.exists(path))
+        job.log.info("End Saved=%s Cancelled=%s", saved, cancelled)
 
         job.on_cancel_enabled(False)
         job.on_download_enabled(True)
@@ -189,10 +203,21 @@ class DownloadController:
         elif data['status'] == 'finished':
             job.on_status("Processing file...")
 
-    def _resolve_target_dir(self, url: str, base_dir: str) -> str:
+    def _prepare_target(self, job: DownloadJob) -> tuple[str, str]:
+        url = self._normalize_url(job.url)
+
+        if url != job.url:
+            job.log.info("normalize_url changed=True new_url=%s", url)
+        folder_path = self._resolve_target_dir(url, job.out_dir, job)
+
+        return url, folder_path
+
+    def _resolve_target_dir(self, url: str, base_dir: str, job: DownloadJob) -> str:
         try:
             info = self._youtube_service.get_url_info(url)
-            if not info.get("is_playlist"):
+            is_playlist = info.get("is_playlist")
+            job.log.info("URL is_playlist:-%s", is_playlist)
+            if not is_playlist:
                 return base_dir
 
             name = sanitize_filename(info.get("title") or "").strip(" .")
@@ -201,9 +226,11 @@ class DownloadController:
 
             path = os.path.join(base_dir, name)
             os.makedirs(path, exist_ok=True)
+            job.log.info("New destination path=%s", path)
             return path.replace("\\", "/")
 
-        except Exception:
+        except Exception as e:
+            job.log.warning('resolve_target_dir failed, using base folder error="%s"', e)
             return base_dir
 
     def _cleanup_partial_files(self, job: DownloadJob):
@@ -244,5 +271,6 @@ class DownloadController:
         return url
 
     def _report_error(self, e: Exception, job: DownloadJob):
-        error = self._error.classify_error(error=e)
-        job.on_status(error)
+        error_shown = self._error.classify_error(error=e)
+        job.log.error('Raw Error:"%s" Show Error="%s"', e, error_shown)
+        job.on_status(error_shown)

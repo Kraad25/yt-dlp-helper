@@ -138,6 +138,7 @@ class ExploreController:
         enable_download: Callable = lambda enabled: None,
         enable_cancel: Callable = lambda enabled: None,
         update_progress: Callable = lambda value: None,
+        kind: str = "ex",
     ):
         data = {"url": url, "mode": mode, "quality": quality}
         return self._download_controller.download_requested(
@@ -148,6 +149,7 @@ class ExploreController:
             enable_cancel,
             update_progress,
             update_status,
+            kind
         )
 
     # Private Methods
