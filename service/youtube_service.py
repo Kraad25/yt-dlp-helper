@@ -20,7 +20,7 @@ class YoutubeService:
         self._ffmpeg_dir = ffmpeg_dir
 
     # Public Methods
-    def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None):
+    def audio_download(self, url, out_dir, quality='192 kbps', progress_hook=None, logger=None):
         quality_value = quality.split()[0]  # "192 kbps" -> "192"
         downloaded_files = []
 
@@ -28,6 +28,7 @@ class YoutubeService:
             'outtmpl': os.path.join(out_dir, '%(title).150B.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
+            'no_color': True,
             'ignoreerrors': True,
             'socket_timeout': 15,
             'retries': 3,
@@ -48,13 +49,15 @@ class YoutubeService:
         }
         if progress_hook:
             ydl_opts['progress_hooks'] = [progress_hook]
+        if logger:
+            ydl_opts['logger'] = logger
             
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
         return downloaded_files
 
-    def video_download(self, url, out_dir, quality='720p', progress_hook=None):
+    def video_download(self, url, out_dir, quality='720p', progress_hook=None, logger=None):
         downloaded_files = []
 
         quality_map = {
@@ -71,6 +74,7 @@ class YoutubeService:
             'outtmpl': os.path.join(out_dir, '%(title).150B.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
+            'no_color': True,
             'ignoreerrors': True,
             'socket_timeout': 15,
             'retries': 3,
@@ -86,6 +90,8 @@ class YoutubeService:
         }
         if progress_hook:
             ydl_opts['progress_hooks'] = [progress_hook]
+        if logger:
+            ydl_opts['logger'] = logger
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
@@ -129,6 +135,7 @@ class YoutubeService:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'no_color': True,
             'extract_flat': True,
             'skip_download': True,
             'playlistend': 1,
@@ -157,6 +164,7 @@ class YoutubeService:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'no_color': True,
             'extract_flat': True,
             'skip_download': True,
             'playlist_items': f"{start}-{end}",
@@ -213,6 +221,7 @@ class YoutubeService:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'no_color': True,
             'extract_flat': True,
             'skip_download': True,
             'playlist_items': f"1-{max_items}",
@@ -252,6 +261,7 @@ class YoutubeService:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'no_color': True,
             'extract_flat': True,
             'skip_download': True,
             'playlistend': 1,   # <- only want the first track

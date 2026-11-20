@@ -6,7 +6,7 @@ class ErrorHandlingService:
         (r"confirm your age|age[- ]restricted", "Video is age-restricted"),
         (r"private video", "Video is private"),
         (r"not available in your (country|region)", "Video is not available in your region"),
-        (r"video unavailable", "Video is unavailable"),
+        (r"video is unavailable", "Video is unavailable"),
         (r"is not a valid url|unsupported url", "Invalid URL format"),
         (r"HTTP Error 403\b", "Access denied (403)"),
         (r"HTTP Error 404\b", "Video not found (404)"),
@@ -37,4 +37,9 @@ class ErrorHandlingService:
             if re.search(pattern, text, re.I):
                 return f"Error: {message}"
 
-        return f"Error: {text}"
+        return f"Error: {self._strip_ytdlp_prefix(text)}"
+
+    def _strip_ytdlp_prefix(self, text: str) -> str:
+        text = re.sub(r"^\s*ERROR:\s*", "", text)
+        text = re.sub(r"^\[[^\]]+\]\s+[^\s:]+:\s*", "", text)
+        return text.strip()

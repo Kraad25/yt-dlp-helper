@@ -14,6 +14,7 @@ from model.validators import DownloadValidator
 from service.youtube_service import YoutubeService
 from service.error_service import ErrorHandlingService
 from service.video_processing_service import VideoProcessingService
+from service.yt_dlp_log_collector import YtdlpLogCollector
 
 from core.paths import ffmpeg_directory
 from core.job_logger import JobLogger, job_ids
@@ -112,12 +113,14 @@ class DownloadController:
     def _run_audio_download(self, job: DownloadJob):
         try:
             url, folder_path = self._prepare_target(job)
+            collector = YtdlpLogCollector(job.log)
 
             downloaded_files = self._youtube_service.audio_download(
                 url=url,
                 out_dir=folder_path,
                 quality=job.quality,
                 progress_hook=lambda data: self._progress_hook(job, data),
+                logger=collector,
             )
 
             job.finished_files.extend(downloaded_files)
@@ -125,9 +128,10 @@ class DownloadController:
             if not job.cancel.is_set():
                 saved = [file for file in downloaded_files if os.path.exists(file)]
                 if saved:
-                    job.on_status("Done")
+                    failed = self._count_failures(job, collector, len(saved))
+                    job.on_status(f"Downloaded: {len(saved)} Failed: {failed}")
                 else:
-                    job.on_status("Download failed, nothing was saved")
+                    self._report_nothing_saved(job, collector)
 
         except Exception as e:
             if not job.cancel.is_set():
@@ -139,12 +143,14 @@ class DownloadController:
     def _run_video_download(self, job: DownloadJob):
         try:
             url, folder_path = self._prepare_target(job)
+            collector = YtdlpLogCollector(job.log)
 
             downloaded_files = self._youtube_service.video_download(
                 url=url,
                 out_dir=folder_path,
                 quality=job.quality,
                 progress_hook=lambda data: self._progress_hook(job, data),
+                logger=collector,
             )
 
             job.finished_files.extend(downloaded_files)
@@ -153,13 +159,14 @@ class DownloadController:
                 saved = [file for file in downloaded_files if os.path.exists(file)]
 
                 if not saved:
-                    job.on_status("Download failed, nothing was saved")
+                    self._report_nothing_saved(job, collector)
                 else:
                     for i, file in enumerate(saved, 1):
                         job.on_status(f"Transcoding {i}/{len(saved)} ...")
                         self._video_processor.transcode(file, job.encoder, job.cancel)
 
-                    job.on_status(f"Done: {len(saved)} item downloaded")
+                    failed = self._count_failures(job, collector, len(saved))
+                    job.on_status(f"Downloaded: {len(saved)} Failed: {failed}")
 
         except Exception as e:
             if not job.cancel.is_set():
@@ -291,7 +298,22 @@ class DownloadController:
             return f"https://www.youtube.com/playlist?list={list_id}"
         return url
 
+    def _count_failures(self, job: DownloadJob, collector: YtdlpLogCollector, saved: int) -> int:
+        failed = len(collector.errors)
+        if failed:
+            job.log.warning("Partial Failure Saved=%s Failed=%s", saved, failed)
+        return failed
+
     def _report_error(self, e: Exception, job: DownloadJob):
         error_shown = self._error.classify_error(error=e)
         job.log.error('Raw Error:"%s" Show Error="%s"', e, error_shown)
         job.on_status(error_shown)
+
+    def _report_nothing_saved(self, job: DownloadJob, collector: YtdlpLogCollector):
+        if collector.errors:
+            shown = self._error.classify_error(error=RuntimeError(collector.errors[-1]))
+            job.log.error('Nothing Saved, Shown:"%s"', shown)
+        else:
+            shown = "Download failed, nothing was saved"
+            job.log.error("Nothing Saved, no yt-dlp error captured")
+        job.on_status(shown)
