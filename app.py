@@ -96,8 +96,8 @@ class App:
         
         try:
             self.root.iconbitmap(resource_dir()/"flag.ico")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger("app").warning('Icon Not Loaded Error:"%s"', e)
 
     def _setup_window(self):
         self.root.title(f"Media Downloader {VERSION}")

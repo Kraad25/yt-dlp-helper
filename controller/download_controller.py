@@ -163,7 +163,8 @@ class DownloadController:
                 else:
                     for i, file in enumerate(saved, 1):
                         job.on_status(f"Transcoding {i}/{len(saved)} ...")
-                        self._video_processor.transcode(file, job.encoder, job.cancel)
+                        result = self._video_processor.transcode(file, job.encoder, job.cancel)
+                        job.log.info("Transcode File:%s Result:%s Encoder:%s", os.path.basename(file), result, job.encoder)
 
                     failed = self._count_failures(job, collector, len(saved))
                     job.on_status(f"Downloaded: {len(saved)} Failed: {failed}")

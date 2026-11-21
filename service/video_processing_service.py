@@ -13,29 +13,33 @@ class VideoProcessingService:
         self._ffmpeg_dir = ffmpeg_dir
         self._ffprobe_path = self._ffmpeg_dir / 'ffprobe.exe'
 
-    def transcode(self, input_file: str, encoder: str, cancel: threading.Event) -> None:
+    def transcode(self, input_file: str, encoder: str, cancel: threading.Event) -> str:
         try:
             if cancel.is_set():
-                return
-            
-            if self._is_h264_video(input_file):
-                return
-            
-            encoder_args = self._build_video_encoder_args(encoder)
-            self._transcode_with_encoder(input_file, encoder_args, cancel)
+                return "cancelled"
 
+            codec = self._probe_codec(input_file)
+
+            if codec == "h264":
+                return "skipped"
+
+            encoder_args = self._build_video_encoder_args(encoder)
+            if not self._transcode_with_encoder(input_file, encoder_args, cancel):
+                return "cancelled"
+
+            return "transcoded" if codec else "transcoded_probe_failed"
+        
         except Exception as e:
             raise Exception(f"Transcoding Failed: {e}")
 
-    def _is_h264_video(self, input_file: str) -> bool:
+    def _probe_codec(self, input_file: str) -> str | None:
         try:
             probe_data = self._probe_video_stream(input_file)
-            codec = probe_data['streams'][0].get('codec_name', '')
-            return codec == 'h264'
+            return probe_data['streams'][0].get('codec_name') or None
         except Exception:
-            return False # Assumes needs transcoding on error
+            return None 
         
-    def _transcode_with_encoder(self, input_file: str, encoder_args: list, cancel: threading.Event) -> None:
+    def _transcode_with_encoder(self, input_file: str, encoder_args: list, cancel: threading.Event) -> bool:
         input_path = Path(input_file)
         temp_output = input_path.with_stem(f"{input_path.stem}_temp")
 
@@ -70,7 +74,7 @@ class VideoProcessingService:
                         process.kill()
                         process.wait()
                         temp_output.unlink(missing_ok=True)
-                        return
+                        return False
 
             if process.returncode != 0:
                 error_log.seek(0)
@@ -79,6 +83,7 @@ class VideoProcessingService:
                 raise Exception(f"FFmpeg error: {message}")
 
         os.replace(temp_output, input_path)
+        return True
         
     def _probe_video_stream(self, input_file: str) -> dict:
         cmd = self._build_probe_cmd(input_file)

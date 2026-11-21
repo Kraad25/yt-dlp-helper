@@ -11,9 +11,12 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps
 
 from core.paths import user_data_dir
+from core.job_logger import JobLogger
 
 TOTAL_CACHE_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 MAX_WORKERS = 4
+
+log = JobLogger("thumbnail")
 
 class ThumbnailService:
     def __init__(self, width: int = 160, height: int = 90):
@@ -53,7 +56,8 @@ class ThumbnailService:
                 image = self._download(url)
                 self._save_to_cache(url, image)
             image = ImageOps.fit(image, (self._width, self._height))
-        except Exception:
+        except Exception as e:
+            log.warning('Thumbnail Failed Url:%s Error:"%s"', url, e)
             image = None
 
         with self._lock:
@@ -62,8 +66,8 @@ class ThumbnailService:
         for callback in callbacks:
             try:
                 callback(image)
-            except Exception:
-                pass
+            except Exception as e:
+                log.exception('Thumbnail Callback Crashed Url:%s Error:"%s"', url, e)
 
     def _cache_path(self, url: str) -> Path:
         key = hashlib.sha256(url.encode("utf-8")).hexdigest()
@@ -77,7 +81,8 @@ class ThumbnailService:
             image = Image.open(path).convert("RGB")
             os.utime(path)
             return image
-        except Exception:
+        except Exception as e:
+            log.warning('Thumbnail Cache Unreadable, re-downloading File:%s Error:"%s"', path.name, e)
             return None
 
     def _download(self, url: str):
@@ -90,17 +95,25 @@ class ThumbnailService:
     def _save_to_cache(self, url: str, image):
         try:
             image.save(self._cache_path(url), format="JPEG")
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning('Thumbnail Not Cached Url:%s Error:"%s"', url, e)
 
     def _trim_cache(self):
+        removed = 0
         try:
             files = [(p, p.stat()) for p in self._cache_dir.glob("*.jpg")]
             total = sum(stat.st_size for _, stat in files)
             for path, stat in sorted(files, key=lambda item: item[1].st_mtime):
                 if total <= TOTAL_CACHE_MAX_BYTES:
                     break
+
                 path.unlink(missing_ok=True)
                 total -= stat.st_size
-        except OSError:
-            pass
+                removed += 1
+
+        except OSError as e:
+            log.warning('Thumbnail Cache Trim Failed Error:"%s"', e)
+            return
+
+        if removed:
+            log.info("Thumbnail Cache Trimmed Removed=%s", removed)

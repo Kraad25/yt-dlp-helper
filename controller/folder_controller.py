@@ -2,6 +2,10 @@ import os
 from typing import Callable
 from model.folder_model import FolderModel
 
+from core.job_logger import JobLogger
+
+log = JobLogger("folder")
+
 class FolderController:
     def __init__(self, key: str, set_base_folder: Callable = None):
         self._model = FolderModel(key)
@@ -19,7 +23,11 @@ class FolderController:
         saved = self._model.get_base_directory()
         if saved and os.path.isdir(saved):
             return saved
-        return self._default_directory()
+
+        default = self._default_directory()
+        if saved:
+            log.info("Saved Folder Missing, using default Saved:%s Default:%s", saved, default)
+        return default
 
     def store_destination_path(self, selected):
         if not selected:

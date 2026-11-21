@@ -15,10 +15,12 @@ from service.database_service import (
 )
 
 from core.paths import ffmpeg_directory
+from core.job_logger import JobLogger
 
 from concurrent.futures import ThreadPoolExecutor
 
 SECTION_BATCH_SIZE = 20
+cover_log = JobLogger("cover")
 
 class ExploreController:
     def __init__(self, download_controller: DownloadController):
@@ -82,10 +84,19 @@ class ExploreController:
             return
 
         def task():
-            cover = self._youtube_service.get_playlist_cover(playlist_url)
+            try:
+                cover = self._youtube_service.get_playlist_cover(playlist_url)
+            except Exception as e:
+                cover_log.warning('Playlist Cover Failed Url:%s Error:"%s"', playlist_url, e)
+                cover = None
+
             if cover:
                 self._cover_cache[playlist_url] = cover
-            on_ready(cover)
+
+            try:
+                on_ready(cover)
+            except Exception as e:
+                cover_log.error('Playlist Cover Callback Crashed Url:%s Error:"%s"', playlist_url, e)
 
         self._cover_pool.submit(task)
 

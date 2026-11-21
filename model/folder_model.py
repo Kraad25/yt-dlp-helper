@@ -2,6 +2,9 @@ import os
 import json
 
 from core.paths import user_data_dir
+from core.job_logger import JobLogger
+
+log = JobLogger("folder")
 
 class FolderModel:
     def __init__(self, key: str):
@@ -26,7 +29,11 @@ class FolderModel:
             with open(self._config_path, "r") as f:
                 return json.load(f)
             
-        except (FileNotFoundError, json.JSONDecodeError):
+        except FileNotFoundError:
+            return {}
+
+        except (json.JSONDecodeError, OSError) as e:
+            log.warning('Folder Config Unreadable, using defaults Error:"%s"', e)
             return {}
 
     def _write_config(self, config: dict):
