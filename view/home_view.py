@@ -8,6 +8,7 @@ from view.quality_selector import QualitySelector
 
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
+from controller.settings_controller import EncoderScope
 
 class HomeView(BaseView):
 
@@ -38,7 +39,6 @@ class HomeView(BaseView):
         self._folder_controller: FolderController = None
 
         self._current_job = None
-        self._video_encoder: str = "CPU"
         self._thread_dispatcher = None
 
         super().__init__(parent)
@@ -68,9 +68,6 @@ class HomeView(BaseView):
         else:
             self._exit_download_state()
 
-    def set_video_encoder(self, encoder: str):
-        self._video_encoder = encoder
-
     def update_progress(self, value: int):
         if self._progress_bar:
             self._progress_bar.set(value / 100)
@@ -90,7 +87,7 @@ class HomeView(BaseView):
         self._current_job = self._download_controller.download_requested(
             data,
             path,
-            self._video_encoder,
+            EncoderScope.HOME,
             self._thread_dispatcher.wrap(self.set_download_enabled),
             self._thread_dispatcher.wrap(self.set_cancel_enabled),
             self._thread_dispatcher.wrap(self.update_progress),

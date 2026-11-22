@@ -28,13 +28,12 @@ from core.paths import resource_dir
 from view.theme import AppTheme
 from view.home_view import HomeView
 from view.explorer_view import ExplorerView
+from view.settings_view import SettingsView
 
 from controller.folder_controller import FolderController
 from controller.download_controller import DownloadController
 from controller.explore_controller import ExploreController
-
-from service.update_service import UpdateService
-from service.encoder_test_service import EncoderTestService
+from controller.settings_controller import SettingsController
 
 from model.watcher_db_model import initialize_database
 
@@ -62,18 +61,14 @@ class App:
 
         self._home_view: HomeView = None
         self._explorer_view: ExplorerView = None
-        self._current_view: HomeView | ExplorerView = None
+        self._current_view: HomeView | ExplorerView | SettingsView = None
 
 
         self._download_controller: DownloadController = None
         self._explore_controller: ExploreController = None
         self._folder_controller: FolderController = None
         self._explore_folder_controller: FolderController = None
-
-        self._update_service: UpdateService = None
-        self._updating = False
-
-        self._encoder_var = tk.StringVar(value="CPU")
+        self._settings_controller: SettingsController = None
 
         initialize_database()
         self._setup()
@@ -88,12 +83,7 @@ class App:
         self._initialize_controllers()
         self._wire_controllers_to_views()
         self._show_home()
-
-        tester = EncoderTestService()
-        tester.list_available_encoder(self._thread_dispatcher.wrap(self._on_encoders_detected))
-
-        self._update_service = UpdateService()
-        
+       
         try:
             self.root.iconbitmap(resource_dir()/"flag.ico")
         except Exception as e:
@@ -119,28 +109,14 @@ class App:
         menubar.add_cascade(label="File", menu=self._file_menu)
         self._file_menu.add_command(label="Home", command=self._show_home)
         self._file_menu.add_command(label="Explore Youtube", command=self._show_explore)
-        self._file_menu.add_separator()
-        self._file_menu.add_command(label="Update", command=self._check_for_updates)
-        self._file_menu.add_separator()
+        self._file_menu.add_separator()        
         self._file_menu.add_command(label="Exit", command=self.root.destroy)
 
-        about_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="About", menu=about_menu)
-        about_menu.add_command(label="About", command=self._show_about)
+        menubar.add_command(label="About", command=self._show_about)
 
-        self._settings_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Settings", menu=self._settings_menu)
+        # Settings submenu
+        menubar.add_command(label="Settings", command=self._show_settings)
 
-        # Encoder submenu
-        self._encoder_menu = tk.Menu(self._settings_menu, tearoff=0)
-        self._settings_menu.add_cascade(label="Video encoder", menu=self._encoder_menu)
-
-        self._encoder_menu.add_radiobutton(
-            label="CPU (default)",
-            variable=self._encoder_var,
-            value="CPU",
-            command=self._on_encoder_selected,
-        )
         self.root.configure(menu=menubar)
 
     def _initialize_views(self):
@@ -150,14 +126,21 @@ class App:
         self._explorer_view = ExplorerView(self.root)
         self._explorer_view.grid(row=0, column=0, sticky="nsew")
 
+        self._settings_view = SettingsView(self.root)
+        self._settings_view.grid(row=0, column=0, sticky="nsew")
+
         self._home_view.set_thread_dispatcher(self._thread_dispatcher)
         self._explorer_view.set_thread_dispatcher(self._thread_dispatcher)
+        self._settings_view.set_thread_dispatcher(self._thread_dispatcher)
 
     def _initialize_controllers(self):
-        self._download_controller = DownloadController()
+        self._settings_controller = SettingsController()
+        
+        self._download_controller = DownloadController(self._settings_controller)
+        self._explore_controller = ExploreController(self._download_controller)
+        
         self._folder_controller = FolderController(MANUAL_DOWNLOAD_DIR_KEY, self._home_view.set_base_folder_path)
         self._explore_folder_controller = FolderController(EXPLORE_DOWNLOAD_DIR_KEY, self._explorer_view.set_base_folder_path)
-        self._explore_controller = ExploreController(self._download_controller)
 
     def _wire_controllers_to_views(self):
         self._home_view.set_controllers(
@@ -169,6 +152,8 @@ class App:
             folder_controller=self._explore_folder_controller,
         )
 
+        self._settings_view.set_controllers(self._settings_controller)        
+
     # Views
     def _show_home(self):
         self._current_view = self._home_view
@@ -178,78 +163,26 @@ class App:
         self._current_view = self._explorer_view
         self._explorer_view.tkraise()
 
-    # Encoder Selection
-    def _on_encoders_detected(self, encoders: list):
-        self._encoder_menu.delete(0, 'end')
-
-        if not encoders:
-            self._encoder_var.set("CPU")
-            self._encoder_menu.add_radiobutton(
-                label="CPU (default)",
-                variable=self._encoder_var,
-                value="CPU",
-                command=self._on_encoder_selected,
-            )
-            return
-
-        for info in encoders:
-            encoder_type = info["type"]  # "QSV" / "NVENC" / "AMF" / "CPU"
-            label = f"{info.get('name', '')}"
-            self._encoder_menu.add_radiobutton(
-                label=label,
-                variable=self._encoder_var,
-                value=encoder_type,
-                command=self._on_encoder_selected,
-            )
-
-        first_type = encoders[0]["type"]
-        self._encoder_var.set(first_type)
-        self._on_encoder_selected()
-
-    def _on_encoder_selected(self):
-        encoder_type = self._encoder_var.get()
-        self._home_view.set_video_encoder(encoder_type)
-        self._explorer_view.set_video_encoder(encoder_type)
-
-    # Update yt-dlp & ffmpeg
-    def _check_for_updates(self):
-        if self._updating:
-            return
-        self._updating = True
-        self._file_menu.entryconfigure("Update", state="disabled")
-
-        self._change_status_for_updates("Checking and Updating")
-        self._update_service.update_program(
-            update_status=self._thread_dispatcher.wrap(self._change_status_for_updates),
-            on_done=self._thread_dispatcher.wrap(self._on_update_finished),
-        )
-
-    def _on_update_finished(self):
-        self._updating = False
-        self._file_menu.entryconfigure("Update", state="normal")
-
-    def _change_status_for_updates(self, message):
-        self._home_view.update_status(message)
-        self._explorer_view.update_status(message)
+    def _show_settings(self):
+        self._current_view = self._settings_view
+        self._settings_view.tkraise()
 
     # About Section
     def _show_about(self):
-        yt_dlp_version = ""
-        ffmpeg_version = ""
-        if self._update_service:
-            yt_dlp_version = self._update_service.get_ytdlp_version()
-            ffmpeg_version = self._update_service.get_ffmpeg_version()
+        yt_dlp_version = self._settings_controller.get_ytdlp_version()
+        ffmpeg_version = self._settings_controller.get_ffmpeg_version()
 
         messagebox.showinfo(
             "About",
             f"Media Downloader {VERSION}\n\n"
-            "This program uses yt-dlp for downloading and processing media.\n"
-            "Project page and supported sites:\n"
-            "https://github.com/yt-dlp/yt-dlp\n\n"
-            "See the yt-dlp repository for full licensing information.\n\n"
-
-            f"yt-dlp version {yt_dlp_version}\n"
-            f"ffmpeg version {ffmpeg_version}"
+            "Download audio (MP3) or video (MP4) from supported sites,\n"
+            "and browse YouTube without leaving the app.\n\n"
+            "Powered by\n"
+            f"   yt-dlp  {yt_dlp_version}\n"
+            f"   ffmpeg  {ffmpeg_version}\n\n"
+            "yt-dlp project and supported sites:\n"
+            "https://github.com/yt-dlp/yt-dlp\n"
+            "See that repository for full licensing information."
         )
 
 

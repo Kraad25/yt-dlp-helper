@@ -11,6 +11,8 @@ from urllib.parse import urlparse, parse_qs
 
 from model.validators import DownloadValidator
 
+from controller.settings_controller import SettingsController
+
 from service.youtube_service import YoutubeService
 from service.error_service import ErrorHandlingService
 from service.video_processing_service import VideoProcessingService
@@ -38,8 +40,9 @@ class DownloadJob:
     finished_files: list = field(default_factory=list)
 
 class DownloadController:    
-    def __init__(self):
+    def __init__(self, settings_controller: SettingsController):
         self._ffmpeg_dir = ffmpeg_directory()
+        self._settings = settings_controller
         
         self._youtube_service = YoutubeService(self._ffmpeg_dir)
         self._video_processor = VideoProcessingService(self._ffmpeg_dir)
@@ -50,7 +53,7 @@ class DownloadController:
             self, 
             data: dict, 
             path: str,
-            encoder: str, 
+            scope: str,
             enable_download: Callable,
             enable_cancel: Callable,
             update_progress: Callable, 
@@ -58,6 +61,8 @@ class DownloadController:
             kind: str = "dl"
     ) -> DownloadJob | None:
 
+        encoder = self._settings.get_encoder(scope)
+        
         job = DownloadJob(
             url=data.get("url", ""),
             mode=data.get("mode", ""),

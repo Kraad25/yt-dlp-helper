@@ -3,6 +3,7 @@ import threading
 from typing import Callable
 
 from controller.download_controller import DownloadController
+from controller.settings_controller import EncoderScope
 
 from model.validators import WatcherValidator
 
@@ -143,8 +144,7 @@ class ExploreController:
         url: str,
         mode: str,
         quality: str,
-        path: str,
-        encoder: str,
+        path: str,        
         update_status: Callable,
         enable_download: Callable = lambda enabled: None,
         enable_cancel: Callable = lambda enabled: None,
@@ -155,7 +155,7 @@ class ExploreController:
         return self._download_controller.download_requested(
             data,
             path,
-            encoder,
+            EncoderScope.EXPLORE,
             enable_download,
             enable_cancel,
             update_progress,

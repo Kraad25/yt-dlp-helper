@@ -45,7 +45,6 @@ class ExplorerView(BaseView):
         self._rows_shown = 0
         self._search_entries: list[dict] = []
         self._search_has_more = False
-        self._video_encoder: str = "CPU"
 
         self._thumb_refs = []
         self._render_generation = 0
@@ -76,9 +75,6 @@ class ExplorerView(BaseView):
 
     def set_thread_dispatcher(self, dispatcher):
         self._thread_dispatcher = dispatcher
-
-    def set_video_encoder(self, encoder: str):
-        self._video_encoder = encoder
 
     def update_status(self, status: str):
         if self._status_label:
@@ -186,11 +182,10 @@ class ExplorerView(BaseView):
         quality = self._quality_selector.get_value()
         url = item_data.get("url")
         title = item_data.get("title", "this video")
-        encoder = self._video_encoder
 
         self.update_status(f"Downloading: {title}")
         job = self._explore_controller.download(
-            url, mode, quality, base_path, encoder,
+            url, mode, quality, base_path,
             update_status=self._thread_dispatcher.wrap(self.update_status),
         )
 
