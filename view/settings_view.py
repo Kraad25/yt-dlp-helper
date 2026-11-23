@@ -17,33 +17,38 @@ class SettingsView(BaseView):
         SettingsPage.EXPLORE: "Explore View",
     }
 
+    PARALLEL_DOWNLOAD_CHOICES = [1, 2, 3, 4]
+    PARALLEL_TRANSCODING_CHOICES = [1, 2]
+    DOWNLOAD_QUEUE_LIMIT_CHOICES = [50, 100, 200]
+
     # Grid layout rows (General page)
     ROW_TITLE = 0
     ROW_SUBTITLE = 1
-    ROW_ENCODER = 2
-    ROW_SPACER = 3
-    ROW_UPDATES = 4
+    ROW_PANEL = 2
 
     def __init__(self, parent):
-        self._nav_buttons: dict = {}
-        self._pages: dict = {}
         self._accent_color = customtkinter.ThemeManager.theme["CTkButton"]["fg_color"]
+
+        self._nav_buttons: dict = {}
+        self._nav_font_active = None
+        self._nav_font_idle = None
+        self._pages: dict = {}
+        
+        self._thread_dispatcher = None
 
         self._settings_controller: SettingsController = None
 
         self._general_encoder_var = customtkinter.StringVar(value="CPU (default)")
         self._general_encoder_menu = None
         self._encoder_type_by_name: dict = {}
-
         self._redetect_button = None
+
+        self._parallel_downloads_var = customtkinter.StringVar(value="2")
+        self._parallel_transcodes_var = customtkinter.StringVar(value="1")
+        self._queue_limit_var = customtkinter.StringVar(value="200")
 
         self._update_button = None
         self._update_status_label = None
-
-        self._thread_dispatcher = None
-
-        self._nav_font_active = None
-        self._nav_font_idle = None
 
         super().__init__(parent)
 
@@ -51,6 +56,8 @@ class SettingsView(BaseView):
     def set_controllers(self, settings_controller: SettingsController):
         self._settings_controller = settings_controller
         self._refresh_encoders()
+        self._refresh_queue_settings()
+        
         self._settings_controller.detect_encoders(
             on_done=self._thread_dispatcher.wrap(self._on_encoders_detected),
         )
@@ -75,6 +82,15 @@ class SettingsView(BaseView):
     def _on_encoders_detected(self):
         self._refresh_encoders()
         self._set_redetecting_button_text(False)
+
+    def _on_parallel_downloads_changed(self, value: str):
+        self._settings_controller.set_parallel_downloads(value)
+
+    def _on_parallel_transcodes_changed(self, value: str):
+        self._settings_controller.set_parallel_transcodes(value)
+
+    def _on_queue_limit_changed(self, value: str):
+        self._settings_controller.set_queue_limit(value)
 
     def _on_update_clicked(self):
         started = self._settings_controller.check_for_updates(
@@ -169,7 +185,7 @@ class SettingsView(BaseView):
         page = customtkinter.CTkFrame(parent, fg_color="transparent")
         page.grid(row=0, column=0, sticky="nsew")
         page.grid_columnconfigure(0, weight=1)
-        page.grid_rowconfigure(self.ROW_SPACER, weight=1)
+        page.grid_rowconfigure(self.ROW_PANEL, weight=1)
 
         title = customtkinter.CTkLabel(
             page,
@@ -187,72 +203,141 @@ class SettingsView(BaseView):
             justify="left",
             wraplength=560,
         )
-        subtitle.grid(row=self.ROW_SUBTITLE, column=0, sticky="w", padx=30, pady=(0, 25))
+        subtitle.grid(row=self.ROW_SUBTITLE, column=0, sticky="w", padx=30, pady=(0, 12))
 
-        encoder_menu, redetect_button = self._create_encoder_row(page)
-        update_button, update_status_label = self._create_updates_section(page)
+        panel = customtkinter.CTkFrame(page, fg_color=("gray88", "gray19"), corner_radius=10)
+        panel.grid(row=self.ROW_PANEL, column=0, sticky="nsew", padx=30, pady=(0, 15))
+        panel.grid_columnconfigure(0, weight=1)
+        panel.grid_rowconfigure(0, weight=1)
+
+        scroll = customtkinter.CTkScrollableFrame(panel, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        scroll.grid_columnconfigure(0, weight=1)
+
+        encoder_menu, redetect_button = self._create_encoder_section(scroll)
+        self._create_download_queue_section(scroll)
+        update_button, update_status_label = self._create_updates_section(scroll)
 
         return page, encoder_menu, redetect_button, update_button, update_status_label
 
-    def _create_encoder_row(self, parent):
-        row = customtkinter.CTkFrame(parent, fg_color="transparent")
-        row.grid(row=self.ROW_ENCODER, column=0, sticky="w", padx=30)
+    def _create_encoder_section(self, parent):
+        self._add_heading(parent, row=0, title="Encoder")
+        self._add_setting_label(parent, row=1, label_text="Video encoder")
 
-        label = customtkinter.CTkLabel(row, text="Default video encoder", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
-        label.grid(row=0, column=0, sticky="w", padx=(0, 12))
+        controls = customtkinter.CTkFrame(parent, fg_color="transparent")
+        controls.grid(row=1, column=1, sticky="e", padx=(0, 10))
 
         encoder_menu = customtkinter.CTkOptionMenu(
-            row,
+            controls,
             variable=self._general_encoder_var,
             values=["CPU (default)"],
             command=self._on_general_encoder_changed,
-            width=230,
-            height=36,
+            width=200,
+            height=28,
             dynamic_resizing=False,
         )
-        encoder_menu.grid(row=0, column=1, sticky="w")
+        encoder_menu.grid(row=0, column=0, sticky="e")
 
         redetect_button = customtkinter.CTkButton(
-            row,
-            text="Re-detect encoders",
-            width=140,
-            height=36,
+            controls,
+            text="Re-detect",
+            width=80,
+            height=28,
             fg_color="transparent",
             border_width=1,
             text_color=("gray10", "gray90"),
             command=self._on_redetect_clicked,
         )
-        redetect_button.grid(row=0, column=2, sticky="w", padx=(10, 0))
+        redetect_button.grid(row=0, column=1, sticky="e", padx=(8, 0))
 
         return encoder_menu, redetect_button
 
-    def _create_updates_section(self, parent):
-        section = customtkinter.CTkFrame(parent, fg_color="transparent")
-        section.grid(row=self.ROW_UPDATES, column=0, sticky="ew", padx=30, pady=(0, 25))
-        section.grid_columnconfigure(1, weight=1)
+    def _create_download_queue_section(self, parent):
+        self._add_heading(parent, row=3, title="Download Queue")
 
-        label = customtkinter.CTkLabel(section, text="Updates", font=customtkinter.CTkFont(size=13, weight="bold"), text_color="gray50")
-        label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        self._create_limit_row(
+            parent, 
+            row=4, 
+            label_text="Parallel downloads", 
+            variable=self._parallel_downloads_var, 
+            values=self.PARALLEL_DOWNLOAD_CHOICES, 
+            command=self._on_parallel_downloads_changed,
+        )
+
+        self._create_limit_row(
+            parent, 
+            row=5, 
+            label_text="Parallel transcodes", 
+            variable=self._parallel_transcodes_var, 
+            values=self.PARALLEL_TRANSCODING_CHOICES, 
+            command=self._on_parallel_transcodes_changed,
+        )
+
+        self._create_limit_row(
+            parent, 
+            row=6, 
+            label_text="Queue limit", 
+            variable=self._queue_limit_var, 
+            values=self.DOWNLOAD_QUEUE_LIMIT_CHOICES, 
+            command=self._on_queue_limit_changed,
+        )
+
+    def _create_updates_section(self, parent):
+        self._add_heading(parent, row=9, title="Updates")
+        self._add_setting_label(parent, row=10, label_text="yt-dlp & ffmpeg")
 
         update_button = customtkinter.CTkButton(
-            section,
-            text="Update yt-dlp & ffmpeg",
-            width=180,
-            height=36,
+            parent,
+            text="Update",
+            width=80,
+            height=28,
             command=self._on_update_clicked,
         )
-        update_button.grid(row=1, column=0, sticky="w")
+        update_button.grid(row=10, column=1, sticky="e", padx=(0, 10))
 
         status_label = customtkinter.CTkLabel(
-            section,
+            parent,
             text="",
-            font=customtkinter.CTkFont(size=12, slant="italic"),
+            font=customtkinter.CTkFont(size=11, slant="italic"),
             text_color="gray50",
             anchor="w",
+            justify="left",
+            wraplength=480,
         )
-        status_label.grid(row=1, column=1, sticky="w", padx=(12, 0))
+        status_label.grid(row=11, column=0, columnspan=2, sticky="w", padx=10, pady=(2, 0))
 
         return update_button, status_label
+
+    def _add_heading(self, parent, row: int, title: str):
+        heading = customtkinter.CTkLabel(parent, text=title, font=customtkinter.CTkFont(size=14, weight="bold"), text_color="gray50")
+        heading.grid(row=row, column=0, columnspan=2, sticky="w", padx=10, pady=(3, 0))
+
+    def _add_divider(self, parent, row: int):
+        divider = customtkinter.CTkFrame(parent, height=1, fg_color=("gray78", "gray28"))
+        divider.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=0)
+
+    def _add_setting_label(self, parent, row: int, label_text: str):
+        text_frame = customtkinter.CTkFrame(parent, fg_color="transparent")
+        text_frame.grid(row=row, column=0, sticky="w", padx=10, pady=1)
+
+        label = customtkinter.CTkLabel(text_frame, text=label_text, font=customtkinter.CTkFont(size=12, weight="bold"), anchor="w")
+        label.grid(row=0, column=0, sticky="w")
+    
+    def _create_limit_row(self, parent, row, label_text, variable, values, command):
+        self._add_setting_label(parent, row, label_text)
+
+        menu = customtkinter.CTkOptionMenu(
+            parent,
+            variable=variable,
+            values=[str(value) for value in values],
+            command=command,
+            width=80,
+            height=28,
+            dynamic_resizing=False,
+        )
+        menu.grid(row=row, column=1, sticky="e", padx=(0, 10))
+
+        return menu
 
     def _create_placeholder_page(self, parent, name: str):
         page = customtkinter.CTkFrame(parent, fg_color="transparent")
@@ -281,12 +366,12 @@ class SettingsView(BaseView):
         if busy:
             self._update_button.configure(state="disabled", text="Updating...")
         else:
-            self._update_button.configure(state="normal", text="Update yt-dlp & ffmpeg")    
+            self._update_button.configure(state="normal", text="Update yt-dlp & ffmpeg")
 
     def _set_update_status(self, message: str):
         self._update_status_label.configure(text=message)
 
-    ## Encoder
+    ## Encoder Settings
     def _refresh_encoders(self):
         if not self._settings_controller:
             return
@@ -298,3 +383,12 @@ class SettingsView(BaseView):
         name_by_type = {encoder_type: name for name, encoder_type in self._encoder_type_by_name.items()}
         current_type = self._settings_controller.get_general_encoder()
         self._general_encoder_var.set(name_by_type.get(current_type, "CPU (default)"))
+
+    ## Queue Settings
+    def _refresh_queue_settings(self):
+        if not self._settings_controller:
+            return
+
+        self._parallel_downloads_var.set(str(self._settings_controller.get_parallel_downloads()))
+        self._parallel_transcodes_var.set(str(self._settings_controller.get_parallel_transcodes()))
+        self._queue_limit_var.set(str(self._settings_controller.get_queue_limit()))

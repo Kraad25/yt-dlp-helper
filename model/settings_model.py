@@ -10,7 +10,12 @@ log = JobLogger("settings")
 
 class SettingsModel:
     GENERAL_ENCODER = "general.encoder"
+    GENERAL_PARALLEL_DOWNLOADS = "general.parallel_downloads"
+    GENERAL_PARALLEL_TRANSCODES = "general.parallel_transcodes"
+    GENERAL_QUEUE_LIMIT = "general.queue_limit"
+
     HOME_ENCODER = "home.encoder"
+
     EXPLORE_ENCODER = "explore.encoder"
     EXPLORE_AUTO_DOWNLOAD = "explore.auto_download"
     EXPLORE_POLL_INTERVAL = "explore.poll_interval"
@@ -19,7 +24,12 @@ class SettingsModel:
     # None means "not chosen here, follow General"
     DEFAULTS = {
         GENERAL_ENCODER: "CPU",
+        GENERAL_PARALLEL_DOWNLOADS: 2,
+        GENERAL_PARALLEL_TRANSCODES: 1,
+        GENERAL_QUEUE_LIMIT: 200,
+
         HOME_ENCODER: None,
+        
         EXPLORE_ENCODER: None,
         EXPLORE_AUTO_DOWNLOAD: False,
         EXPLORE_POLL_INTERVAL: WatcherValidator.MIN_POLL_INTERVAL,

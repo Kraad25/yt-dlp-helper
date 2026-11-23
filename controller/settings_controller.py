@@ -7,7 +7,7 @@ from service.update_service import UpdateService
 
 from core.job_logger import JobLogger
 
-log = JobLogger("encoder")
+log = JobLogger("settings")
 
 class EncoderScope:
     HOME = "home"
@@ -18,6 +18,10 @@ class SettingsController:
             EncoderScope.HOME: SettingsModel.HOME_ENCODER,
             EncoderScope.EXPLORE: SettingsModel.EXPLORE_ENCODER,
         }
+
+    PARALLEL_DOWNLOAD_CHOICES = [1, 2, 3, 4]
+    PARALLEL_TRANSCODING_CHOICES = [1, 2]
+    DOWNLOAD_QUEUE_LIMIT_CHOICES = [50, 100, 200]
     
     def __init__(self):
         self._model = SettingsModel()
@@ -68,6 +72,26 @@ class SettingsController:
         log.info("Encoder Selected Scope=%s Type:%s Source:general", scope, general)
         return general
 
+    # Public Methods: Download & Transcode Queue
+    ## Getters
+    def get_parallel_downloads(self) -> int:
+        return self._get_choice(SettingsModel.GENERAL_PARALLEL_DOWNLOADS, self.PARALLEL_DOWNLOAD_CHOICES)
+    
+    def get_parallel_transcodes(self) -> int:
+        return self._get_choice(SettingsModel.GENERAL_PARALLEL_TRANSCODES, self.PARALLEL_TRANSCODING_CHOICES)
+
+    def get_queue_limit(self) -> int:
+        return self._get_choice(SettingsModel.GENERAL_QUEUE_LIMIT, self.DOWNLOAD_QUEUE_LIMIT_CHOICES)
+
+    ## Setters
+    def set_parallel_downloads(self, value):
+        self._set_choice("Parallel Downloads", SettingsModel.GENERAL_PARALLEL_DOWNLOADS, value, self.PARALLEL_DOWNLOAD_CHOICES)
+
+    def set_parallel_transcodes(self, value):
+        self._set_choice("Parallel Transcodes", SettingsModel.GENERAL_PARALLEL_TRANSCODES, value, self.PARALLEL_TRANSCODING_CHOICES)
+
+    def set_queue_limit(self, value):
+        self._set_choice("Queue Limit", SettingsModel.GENERAL_QUEUE_LIMIT, value, self.DOWNLOAD_QUEUE_LIMIT_CHOICES)
 
     # Public Methods: updates
     def check_for_updates(self, on_status: Callable, on_done: Callable) -> bool:
@@ -97,3 +121,29 @@ class SettingsController:
 
         self._available = available
         self._on_encoders_done()
+
+    def _get_choice(self, key: str, choices: list) -> int:
+        default = SettingsModel.DEFAULTS[key]
+        try:
+            value = int(self._model.get(key))
+        except (TypeError, ValueError):
+            return default
+        return value if value in choices else default
+
+    def _set_choice(self, label: str, key: str, value, choices: list):
+        try:
+            wanted = int(value)
+        except (TypeError, ValueError):
+            log.warning('%s Not Changed, not a number Value:"%s"', label, value)
+            return
+
+        if wanted not in choices:
+            log.warning("%s Not Changed, %s is not an allowed choice", label, wanted)
+            return
+
+        old = self._get_choice(key, choices)
+        if wanted == old:
+            return
+
+        self._model.set(key, wanted)
+        log.info("%s Changed From:%s To:%s", label, old, wanted)
