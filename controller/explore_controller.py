@@ -25,6 +25,7 @@ SECTION_BATCH_SIZE = 20
 cover_log = JobLogger("cover")
 search_log = JobLogger("search")
 section_log = JobLogger("section")
+watch_log = JobLogger("watch")
 
 class ExploreController:
     def __init__(self, download_controller: DownloadController):
@@ -108,6 +109,7 @@ class ExploreController:
     
     def start_watch(self, section_name, destination, auto_download, poll_interval, on_ready: Callable, on_error: Callable = None):
         if is_watching(self._section_url):
+            watch_log.info('Section Already In Watch List Url:"%s"', self._section_url)
             return "Already in your watch list"
         
         self._pending_watch = {
@@ -120,6 +122,11 @@ class ExploreController:
 
         self._pending_items = []
 
+        watch_log.info(
+            'Adding Section To Watch List Name:"%s" Url:"%s" AutoDownload:%s Interval:%s',
+            section_name, self._section_url, auto_download, self._pending_watch["poll_interval"],
+        )
+
         threading.Thread(
             target=self._run_list_section,
             args=(self._section_url, on_ready, on_error),
@@ -128,6 +135,7 @@ class ExploreController:
 
     def finish_watch(self, ticked_ids: set) -> str | None:
         if not self._pending_watch:
+            watch_log.warning("Save Skipped, no section pending")
             return "Nothing to save"
 
         for item in self._pending_items:
@@ -191,16 +199,16 @@ class ExploreController:
 
 
     def _run_list_section(self, section_url: str, on_ready: Callable, on_error: Callable):
-        section_log.info('List Section Start Url:"%s"', section_url)
+        section_log.info('Loading Full Section For Watch List Url:"%s"', section_url)
         try:
             items = self._youtube_service.get_section_index(section_url)            
         except Exception as e:
-            self._report_request_error(section_log, "List Section", e, None, on_error)
+            self._report_request_error(section_log, "Loading Full Section For Watch List", e, None, on_error)
             return
 
         self._pending_items = items
         truncated = len(items) >= SECTION_INDEX_LIMIT
-        section_log.info("List Section Done Items:%s Truncated:%s", len(items), truncated)
+        section_log.info("Full Section Loaded Items:%s Truncated:%s", len(items), truncated)
         on_ready(items, truncated)
 
     def _start_section_fetch(self, stale, on_ready: Callable, on_error: Callable):
@@ -212,22 +220,22 @@ class ExploreController:
         thread.start()
 
     def _run_browse_section(self, section_url: str, offset: int, stale, on_ready: Callable, on_error: Callable):
-        section_log.info('Section Start Url:"%s" Offset:%s', section_url, offset)
+        section_log.info('Loading Section Items Url:"%s" Offset:%s', section_url, offset)
         try:
             items = self._youtube_service.get_section_contents(
                 section_url, limit=SECTION_BATCH_SIZE, offset=offset
             )
         except Exception as e:
-            self._report_request_error(section_log, "Section", e, stale, on_error)
+            self._report_request_error(section_log, "Loading Section Items", e, stale, on_error)
             return
 
         if stale.is_set():
-            section_log.info("Section Dropped, newer request replaced it Count:%s", len(items))
+            section_log.info("Section Items Dropped, newer request replaced it Count:%s", len(items))
             return
         
         self._section_offset = offset + SECTION_BATCH_SIZE
         has_more = len(items) >= SECTION_BATCH_SIZE
-        section_log.info("Section Done Items:%s HasMore:%s", len(items), has_more)
+        section_log.info("Section Items Loaded Count:%s HasMore:%s", len(items), has_more)
         on_ready(items, has_more)
 
     def _run_show_more_search(self, pager, stale, on_results: Callable, on_error: Callable):
@@ -248,23 +256,24 @@ class ExploreController:
         on_results(batch, has_more)
 
     def _run_browse_channel(self, channel_url: str, stale, on_ready: Callable, on_error: Callable):
-        section_log.info('Channel Start Url:"%s"', channel_url)
+        section_log.info('Loading Channel Sections Url:"%s"', channel_url)
         try:
             sections = self._youtube_service.get_channel_sections(channel_url)
         except Exception as e:
-            self._report_request_error(section_log, "Channel", e, stale, on_error)
+            self._report_request_error(section_log, "Loading Channel Sections", e, stale, on_error)
             return
 
         if stale.is_set():
-            section_log.info("Channel Dropped, newer request replaced it")
+            section_log.info("Channel Sections Dropped, newer request replaced it")
             return
 
-        section_log.info("Channel Done Tabs:%s", len(sections))
+        section_log.info("Channel Sections Loaded Count:%s", len(sections))
         on_ready(sections)
 
     def _save_watch(self, section_info: dict, items: list[dict]) -> str | None:
         error = self._validator.validate(section_info)
         if error:
+            watch_log.info('Section Not Saved, invalid input Shown:"%s"', error)
             return error
 
         info = {**section_info, "poll_interval": int(section_info["poll_interval"])}
@@ -272,10 +281,15 @@ class ExploreController:
         try:
             os.makedirs(info["destination_path"], exist_ok=True)
         except OSError as e:
+            watch_log.warning('Section Not Saved, couldn\'t create folder Path:"%s" Error:"%s"', info["destination_path"], e)
             return f"Couldn't create the folder: {e}"
 
         if not add_watch_with_items(info, items):
+            watch_log.error('Section Not Saved, database write failed Name:"%s" Items:%s', info["section_name"], len(items))
             return "Couldn't save to your watch list"
+        
+        queued = sum(1 for item in items if item["status"] == ITEM_STATUS_QUEUED)
+        watch_log.info('Section Saved To Watch List Name:"%s" Items:%s Queued:%s', info["section_name"], len(items), queued)
         return None
 
     def _report_request_error(self, log, action: str, e: Exception, stale, on_error):
