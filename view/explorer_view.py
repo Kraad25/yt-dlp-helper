@@ -109,7 +109,7 @@ class ExplorerView(BaseView):
             return
         
         self._set_view_mode(ViewMode.SEARCH)
-        self._explore_controller.cancel_active_request()
+        self._explore_controller.mark_requests_stale()
         self._search_entries.clear()
         self._clear_results()
         self.update_status(f"Searching for '{query}'...")
@@ -124,7 +124,7 @@ class ExplorerView(BaseView):
             self.update_status("This result has no channel link.")
             return
         
-        self._explore_controller.cancel_active_request()
+        self._explore_controller.mark_requests_stale()
         self._current_channel_name = channel_name
         self._clear_results()
         self._set_view_mode(ViewMode.CHANNEL)
@@ -220,7 +220,7 @@ class ExplorerView(BaseView):
             self._tab_bar.grid()
  
     def _on_back_clicked(self):
-        self._explore_controller.cancel_active_request()
+        self._explore_controller.mark_requests_stale()
         self._clear_results()
         self._set_view_mode(ViewMode.SEARCH)
         self._restore_search_results()
@@ -432,11 +432,11 @@ class ExplorerView(BaseView):
 
     def _on_search_error(self, error_message: str):
         self._show_more_button.configure(state="normal")
-        self.update_status(f"Search failed: {error_message}")
+        self.update_status(error_message)
 
     def _on_browse_error(self, error_message: str):
         self._show_more_button.configure(state="normal")
-        self.update_status(f"Couldn't load that: {error_message}")
+        self.update_status(error_message)
 
     ### Thumbnail rendering functions
     def _apply_thumbnail(self, label, image, generation: int):

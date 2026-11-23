@@ -10,6 +10,7 @@ from model.validators import WatcherValidator
 from service.youtube_service import YoutubeService, SECTION_INDEX_LIMIT
 from service.thumbnail_service import ThumbnailService
 from service.search_page_service import SearchPageService
+from service.error_service import ErrorHandlingService
 from service.database_service import (
     add_watch_with_items, is_watching, get_active_or_paused_watch_list,
     ITEM_STATUS_IGNORED, ITEM_STATUS_QUEUED,
@@ -22,6 +23,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 SECTION_BATCH_SIZE = 20
 cover_log = JobLogger("cover")
+search_log = JobLogger("search")
+section_log = JobLogger("section")
 
 class ExploreController:
     def __init__(self, download_controller: DownloadController):
@@ -31,11 +34,12 @@ class ExploreController:
         self._thumbnail_service = ThumbnailService()
         self._validator = WatcherValidator
         self._download_controller = download_controller
+        self._error = ErrorHandlingService()
 
         self._section_url = ""
         self._section_offset = 0
         self._search_pager: SearchPageService | None = None
-        self._active_cancel = threading.Event()
+        self._active_stale = threading.Event()
         self._pending_watch: dict | None = None
         self._pending_items: list[dict] = []
 
@@ -44,36 +48,36 @@ class ExploreController:
 
     # Public Methods
     def search(self, query: str, on_results: Callable, on_error: Callable = None):
-        cancel = self._begin_request()
+        stale = self._begin_request()
         self._search_pager = SearchPageService(fetch=self._youtube_service.search_videos)
-        thread = threading.Thread(target=self._run_search, args=(query, self._search_pager, cancel, on_results, on_error), daemon=True)
+        thread = threading.Thread(target=self._run_search, args=(query, self._search_pager, stale, on_results, on_error), daemon=True)
         thread.start()
 
     def show_more_search(self, on_results: Callable, on_error: Callable = None):
-        cancel = self._begin_request()
-        thread = threading.Thread(target=self._run_show_more_search, args=(self._search_pager, cancel, on_results, on_error), daemon=True)
+        stale = self._begin_request()
+        thread = threading.Thread(target=self._run_show_more_search, args=(self._search_pager, stale, on_results, on_error), daemon=True)
         thread.start()
 
     def browse_channel(self, channel_url: str, on_ready: Callable, on_error: Callable = None):    
-        cancel = self._begin_request()    
+        stale = self._begin_request()    
         thread = threading.Thread(
-            target=self._run_browse_channel, args=(channel_url, cancel, on_ready, on_error), daemon=True
+            target=self._run_browse_channel, args=(channel_url, stale, on_ready, on_error), daemon=True
         )
         thread.start()
 
     def browse_section(self, section_url: str, on_ready: Callable, on_error: Callable = None):
-        cancel = self._begin_request()
+        stale = self._begin_request()
 
         self._section_url = section_url
         self._section_offset = 0
-        self._start_section_fetch(cancel, on_ready, on_error)
+        self._start_section_fetch(stale, on_ready, on_error)
 
     def show_more_section(self, on_ready: Callable, on_error: Callable = None):
-        cancel = self._begin_request()
-        self._start_section_fetch(cancel, on_ready, on_error)
+        stale = self._begin_request()
+        self._start_section_fetch(stale, on_ready, on_error)
 
-    def cancel_active_request(self):
-        self._active_cancel.set()
+    def mark_requests_stale(self):
+        self._active_stale.set()
 
     def get_thumbnail(self, thumbnail_url: str, on_ready: Callable):
         self._thumbnail_service.fetch_async(thumbnail_url, on_ready)    
@@ -165,85 +169,97 @@ class ExploreController:
 
     # Private Methods
     def _begin_request(self) -> threading.Event:
-        self._active_cancel.set()
-        self._active_cancel = threading.Event()
-        return self._active_cancel
+        self._active_stale.set()
+        self._active_stale = threading.Event()
+        return self._active_stale
 
-    def _run_search(self, query: str, pager, cancel, on_results: Callable, on_error: Callable):
+    def _run_search(self, query: str, pager, stale, on_results: Callable, on_error: Callable):
+        search_log.info('Search Start Query:"%s"', query)
         try:
             batch = pager.start(query)
             has_more = pager.has_more()
         except Exception as e:
-            if not cancel.is_set() and on_error:
-                on_error(str(e))
+            self._report_request_error(search_log, "Search", e, stale, on_error)
             return
         
-        if cancel.is_set():
+        if stale.is_set():
+            search_log.info("Search Dropped, newer request replaced it Count:%s", len(batch))
             return
-        
+
+        search_log.info("Search Done Results:%s HasMore:%s", len(batch), has_more)
         on_results(batch, has_more)
 
 
     def _run_list_section(self, section_url: str, on_ready: Callable, on_error: Callable):
+        section_log.info('List Section Start Url:"%s"', section_url)
         try:
-            items = self._youtube_service.get_section_index(section_url)
-            self._pending_items = items
-            truncated = len(items) >= SECTION_INDEX_LIMIT
-            on_ready(items, truncated)
+            items = self._youtube_service.get_section_index(section_url)            
         except Exception as e:
-            if on_error:
-                on_error(str(e))
+            self._report_request_error(section_log, "List Section", e, None, on_error)
+            return
 
-    def _start_section_fetch(self, cancel, on_ready: Callable, on_error: Callable):
+        self._pending_items = items
+        truncated = len(items) >= SECTION_INDEX_LIMIT
+        section_log.info("List Section Done Items:%s Truncated:%s", len(items), truncated)
+        on_ready(items, truncated)
+
+    def _start_section_fetch(self, stale, on_ready: Callable, on_error: Callable):
         thread = threading.Thread(
             target=self._run_browse_section,
-            args=(self._section_url, self._section_offset, cancel, on_ready, on_error),
+            args=(self._section_url, self._section_offset, stale, on_ready, on_error),
             daemon=True,
         )
         thread.start()
 
-    def _run_browse_section(self, section_url: str, offset: int, cancel, on_ready: Callable, on_error: Callable):
+    def _run_browse_section(self, section_url: str, offset: int, stale, on_ready: Callable, on_error: Callable):
+        section_log.info('Section Start Url:"%s" Offset:%s', section_url, offset)
         try:
             items = self._youtube_service.get_section_contents(
                 section_url, limit=SECTION_BATCH_SIZE, offset=offset
             )
         except Exception as e:
-            if not cancel.is_set() and on_error:
-                on_error(str(e))
+            self._report_request_error(section_log, "Section", e, stale, on_error)
             return
 
-        if cancel.is_set():
+        if stale.is_set():
+            section_log.info("Section Dropped, newer request replaced it Count:%s", len(items))
             return
         
         self._section_offset = offset + SECTION_BATCH_SIZE
-        on_ready(items, len(items) >= SECTION_BATCH_SIZE)
+        has_more = len(items) >= SECTION_BATCH_SIZE
+        section_log.info("Section Done Items:%s HasMore:%s", len(items), has_more)
+        on_ready(items, has_more)
 
-    def _run_show_more_search(self, pager, cancel, on_results: Callable, on_error: Callable):
+    def _run_show_more_search(self, pager, stale, on_results: Callable, on_error: Callable):
+        search_log.info("Show More Start")
         try:
             batch = pager.next_page()
             has_more = pager.has_more()
         except Exception as e:
-            if not cancel.is_set() and on_error:
-                on_error(str(e))
+            self._report_request_error(search_log, "Show More", e, stale, on_error)
             return
 
-        if cancel.is_set():
+        if stale.is_set():
             pager.return_batch(batch)
+            search_log.info("Show More Dropped, batch returned Count:%s", len(batch))
             return
 
+        search_log.info("Show More Done Results:%s HasMore:%s", len(batch), has_more)
         on_results(batch, has_more)
 
-    def _run_browse_channel(self, channel_url: str, cancel, on_ready: Callable, on_error: Callable):
+    def _run_browse_channel(self, channel_url: str, stale, on_ready: Callable, on_error: Callable):
+        section_log.info('Channel Start Url:"%s"', channel_url)
         try:
             sections = self._youtube_service.get_channel_sections(channel_url)
         except Exception as e:
-            if not cancel.is_set() and on_error:
-                on_error(str(e))
+            self._report_request_error(section_log, "Channel", e, stale, on_error)
             return
 
-        if cancel.is_set():
+        if stale.is_set():
+            section_log.info("Channel Dropped, newer request replaced it")
             return
-        
+
+        section_log.info("Channel Done Tabs:%s", len(sections))
         on_ready(sections)
 
     def _save_watch(self, section_info: dict, items: list[dict]) -> str | None:
@@ -261,3 +277,13 @@ class ExploreController:
         if not add_watch_with_items(info, items):
             return "Couldn't save to your watch list"
         return None
+
+    def _report_request_error(self, log, action: str, e: Exception, stale, on_error):
+        if stale is not None and stale.is_set():
+            log.info('%s Failed After Newer Request, not shown Error:"%s"', action, e)
+            return
+
+        shown = self._error.classify_error(error=e)
+        log.error('%s Failed Raw Error:"%s" Show Error="%s"', action, e, shown)
+        if on_error:
+            on_error(shown)

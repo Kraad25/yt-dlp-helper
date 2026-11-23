@@ -102,6 +102,7 @@ class YoutubeService:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'no_color': True,
             'extract_flat': True,
             'skip_download': True,
             'socket_timeout': 15,
