@@ -188,9 +188,7 @@ class UpdateService:
                 ffprobe_entry = next((n for n in names if n.endswith("bin/ffprobe.exe")), None)
 
                 if not ffmpeg_entry or not ffprobe_entry:
-                    log.error("ffmpeg Install Failed, ffmpeg.exe or ffprobe.exe missing inside the archive")
-                    update_status("Could not locate ffmpeg/ffprobe inside the archive")
-                    return None
+                    raise RuntimeError("ffmpeg.exe or ffprobe.exe missing inside the archive")
 
                 self._ffmpeg_dir.mkdir(parents=True, exist_ok=True)
                 for entry, target_name in [(ffmpeg_entry, "ffmpeg.exe"), (ffprobe_entry, "ffprobe.exe")]:
@@ -217,15 +215,14 @@ class UpdateService:
 
         try:
             ytdlp_result = self._update_yt_dlp(update_status, log)
-            if ytdlp_result is None:
-                log.info("ffmpeg Skipped, yt-dlp step failed")
-                return
-
             ffmpeg_result = self._update_ffmpeg(update_status, log)
-            if ffmpeg_result is None:
-                return
-            update_status(f"{ytdlp_result}. {ffmpeg_result}")
 
+            if ytdlp_result and ffmpeg_result:
+                update_status(f"{ytdlp_result}. {ffmpeg_result}")
+            else:
+                failed = [name for name, result in (("yt-dlp", ytdlp_result), ("ffmpeg", ffmpeg_result)) if result is None]
+                update_status(f"Update incomplete, {' and '.join(failed)} failed. See the log for details")
+                
         finally:
             log.info('Update End yt-dlp:"%s" ffmpeg:"%s"', ytdlp_result, ffmpeg_result)
             on_done()
