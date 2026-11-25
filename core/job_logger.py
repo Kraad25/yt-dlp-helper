@@ -2,7 +2,6 @@ import itertools
 import logging
 import threading
 
-
 class JobIds:
     def __init__(self):
         self._counters = {}
@@ -12,7 +11,6 @@ class JobIds:
         with self._lock:
             counter = self._counters.setdefault(kind, itertools.count(1))
             return f"{kind}-{next(counter):04d}"
-
 
 class JobLogger(logging.LoggerAdapter):
     def __init__(self, job_id: str):
