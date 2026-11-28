@@ -3,7 +3,7 @@ import threading
 from typing import Callable
 
 from controller.download_controller import DownloadController
-from controller.settings_controller import EncoderScope
+from controller.settings_controller import EncoderScope, SettingsController
 
 from model.validators import WatcherValidator
 
@@ -11,6 +11,7 @@ from service.youtube_service import YoutubeService, SECTION_INDEX_LIMIT
 from service.thumbnail_service import ThumbnailService
 from service.search_page_service import SearchPageService
 from service.error_service import ErrorHandlingService
+from service.download_queue_service import DownloadQueue
 from service.database_service import (
     add_watch_with_items, is_watching, get_active_or_paused_watch_list,
     ITEM_STATUS_IGNORED, ITEM_STATUS_QUEUED,
@@ -28,7 +29,7 @@ section_log = JobLogger("section")
 watch_log = JobLogger("watch")
 
 class ExploreController:
-    def __init__(self, download_controller: DownloadController):
+    def __init__(self, download_controller: DownloadController, settings_controller: SettingsController):
         ffmpeg_dir = ffmpeg_directory()
 
         self._youtube_service = YoutubeService(ffmpeg_dir)
@@ -47,7 +48,37 @@ class ExploreController:
         self._cover_pool = ThreadPoolExecutor(max_workers=6)
         self._cover_cache: dict[str, str] = {}
 
+        self._finished_count = 0
+        self._finished_lock = threading.Lock()
+        self._on_queue_update: Callable | None = None
+
+        self._queue = DownloadQueue(
+            download_workers=settings_controller.get_parallel_downloads(),
+            transcode_workers=settings_controller.get_parallel_transcodes(),
+            queue_limit=settings_controller.get_queue_limit(),
+            run_download=self._run_download_job,
+            run_transcode=self._run_transcode_job,
+            on_skipped=self._on_job_skipped,
+            on_queue_update=self._send_queue_update,
+        )
+        self._queue.start_workers()
+
     # Public Methods
+    def set_on_queue_update_callback(self, callback: Callable):
+        self._on_queue_update = callback
+
+    def get_queue_status(self):
+        status = self._queue.counts()
+        with self._finished_lock:
+            finished = self._finished_count
+
+        return {
+            "downloading": status["downloading"],
+            "waiting": status["waiting"],
+            "transcoding": status["transcoding"] + status["waiting_transcode"],
+            "finished": finished,
+        }
+
     def search(self, query: str, on_results: Callable, on_error: Callable = None):
         stale = self._begin_request()
         self._search_pager = SearchPageService(fetch=self._youtube_service.search_videos)
@@ -158,28 +189,67 @@ class ExploreController:
         quality: str,
         path: str,        
         update_status: Callable,
-        enable_download: Callable = lambda enabled: None,
-        enable_cancel: Callable = lambda enabled: None,
-        update_progress: Callable = lambda value: None,
         kind: str = "ex",
-    ):
+    ) -> bool:
         data = {"url": url, "mode": mode, "quality": quality}
-        return self._download_controller.download_requested(
+        job = self._download_controller.create_job(
             data,
             path,
             EncoderScope.EXPLORE,
-            enable_download,
-            enable_cancel,
-            update_progress,
+            lambda enabled: None, # No enable download
+            lambda enabled: None, # No enable cancel
+            lambda value: None, # No update progress            
             update_status,
             kind
         )
 
+        if not job:
+            return False
+
+        job.on_status = lambda message: None
+        self._reset_finished_if_idle()
+        
+        if not self._queue.add_job(job):
+            job.log.warning("Queue Full, job refused")
+            update_status("Queue is full, try again later")
+            return False
+
+        update_status("Added to download queue")
+        return True
+    
     # Private Methods
     def _begin_request(self) -> threading.Event:
         self._active_stale.set()
         self._active_stale = threading.Event()
         return self._active_stale
+
+    def _run_download_job(self, job):
+        if self._download_controller.run_download(job):
+            self._queue.handover_to_transcode(job)
+        else:
+            self._add_finished()
+
+    def _run_transcode_job(self, job):
+        self._download_controller.run_transcode(job)
+        self._add_finished()
+
+    def _on_job_skipped(self, job):
+        job.log.info("Job Skipped, cancelled while waiting")
+        self._add_finished()
+
+    def _add_finished(self):
+        with self._finished_lock:
+            self._finished_count += 1
+
+    def _reset_finished_if_idle(self):
+        counts = self._queue.counts()
+        if not any(counts.values()):
+            with self._finished_lock:
+                self._finished_count = 0
+
+    def _send_queue_update(self):
+        if self._on_queue_update:
+            self._on_queue_update()
 
     def _run_search(self, query: str, pager, stale, on_results: Callable, on_error: Callable):
         search_log.info('Search Start Query:"%s"', query)

@@ -65,6 +65,7 @@ class ExplorerView(BaseView):
     def set_controllers(self, explore_controller: ExploreController, folder_controller: FolderController):
         self._explore_controller = explore_controller
         self._folder_controller = folder_controller
+        self._explore_controller.set_on_queue_update_callback(self._on_queue_update)
 
         self._refresh_watchlist()        
 
@@ -181,15 +182,13 @@ class ExplorerView(BaseView):
         mode = "mp3" if self._mode_var.get() == QualitySelector.MP3 else "mp4"
         quality = self._quality_selector.get_value()
         url = item_data.get("url")
-        title = item_data.get("title", "this video")
 
-        self.update_status(f"Downloading: {title}")
-        job = self._explore_controller.download(
+        accepted = self._explore_controller.download(
             url, mode, quality, base_path,
             update_status=self._thread_dispatcher.wrap(self.update_status),
         )
 
-        if job:
+        if accepted:
             self._folder_controller.store_destination_path(base_path)
 
     def _on_add_section_to_watchlist(self):
@@ -292,7 +291,7 @@ class ExplorerView(BaseView):
         self._destination_entry, self._browse_button = self._create_destination_input(parent)
         self._mode_segmented, self._quality_selector = self._create_mode_and_quality(parent)        
         self._results_frame, self._search_entry, self._back_button = self._create_results_area(parent)
-        self._status_label = self._create_status_label(parent)
+        self._status_label, self._queue_label = self._create_status_area(parent)
         self._context_menu = self._create_context_menu(parent)
 
     def _create_header(self, parent):
@@ -409,21 +408,37 @@ class ExplorerView(BaseView):
  
         return results_frame, search_entry, back_button
 
-    def _create_status_label(self, parent):
-        label = customtkinter.CTkLabel(
-            parent,
+    def _create_status_area(self, parent):
+        area = customtkinter.CTkFrame(parent, fg_color="transparent", height=45)
+        area.grid(row=self.ROW_STATUS, column=0, sticky="ew", padx=30, pady=(0, 5))
+        area.grid_propagate(False)
+        area.grid_columnconfigure(0, weight=1)
+        area.grid_rowconfigure(0, weight=1)
+
+        status_label = customtkinter.CTkLabel(
+            area,
             text="Type something and hit search",
             font=customtkinter.CTkFont(size=12, slant="italic"),
             text_color="gray50",
             anchor="w",
         )
-        label.grid(row=self.ROW_STATUS, column=0, sticky="w", padx=30, pady=(0, 15))
-        return label
+        status_label.grid(row=0, column=0, sticky="w")
+
+        queue_label = customtkinter.CTkLabel(
+            area,
+            text="",
+            font=customtkinter.CTkFont(size=11),
+            text_color="gray50",
+            anchor="w",
+        )
+        queue_label.grid(row=1, column=0, sticky="sw")
+        queue_label.grid_remove()
+
+        return status_label, queue_label
 
     def _create_context_menu(self, parent):
         menu = tk.Menu(parent, tearoff=0)
         return menu
-
 
     ## Helper Functions
     def _on_mode_change(self):
@@ -655,4 +670,25 @@ class ExplorerView(BaseView):
 
     def _on_backfill_cancelled(self):
         self.update_status("Cancelled, nothing added to your watch list")
+
+    ### Status Change Handlers
+    def _on_queue_update(self):
+        self._thread_dispatcher.post(self._refresh_queue_status)
+
+    def _refresh_queue_status(self):
+        status = self._explore_controller.get_queue_status()
+
+        if status["downloading"] == 0 and status["waiting"] == 0 and status["transcoding"] == 0:
+            self._queue_label.grid_remove()
+            if status["finished"] > 0:
+                self.update_status(f"Downloaded: {status['finished']} items")
+            return
+
+        self._queue_label.configure(
+            text=(
+                f"Downloading: {status['downloading']}   Waiting: {status['waiting']}   "
+                f"Transcoding: {status['transcoding']}   Finished: {status['finished']}"
+            )
+        )
+        self._queue_label.grid()
             

@@ -137,7 +137,7 @@ class App:
         self._settings_controller = SettingsController()
         
         self._download_controller = DownloadController(self._settings_controller)
-        self._explore_controller = ExploreController(self._download_controller)
+        self._explore_controller = ExploreController(self._download_controller, self._settings_controller)
         
         self._folder_controller = FolderController(MANUAL_DOWNLOAD_DIR_KEY, self._home_view.set_base_folder_path)
         self._explore_folder_controller = FolderController(EXPLORE_DOWNLOAD_DIR_KEY, self._explorer_view.set_base_folder_path)

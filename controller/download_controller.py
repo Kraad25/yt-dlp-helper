@@ -17,7 +17,6 @@ from service.youtube_service import YoutubeService
 from service.error_service import ErrorHandlingService
 from service.video_processing_service import VideoProcessingService
 from service.yt_dlp_log_collector import YtdlpLogCollector
-from service.download_queue_service import DownloadQueue
 
 from core.paths import ffmpeg_directory
 from core.job_logger import JobLogger, job_ids
@@ -50,31 +49,21 @@ class DownloadController:
         self._video_processor = VideoProcessingService(self._ffmpeg_dir)
         self._error = ErrorHandlingService()
 
-        self._queue = DownloadQueue(
-            download_workers=self._settings.get_parallel_downloads(),
-            transcode_workers=self._settings.get_parallel_transcodes(),
-            queue_limit=self._settings.get_queue_limit(),
-            run_download=self._run_download,
-            run_transcode=self._run_transcode,
-            on_skipped=self._on_job_skipped,
-        )
-        self._queue.start_workers()
-
     # Public Methods
-    def download_requested(
-            self, 
-            data: dict, 
+    def create_job(
+            self,
+            data: dict,
             path: str,
             scope: str,
             enable_download: Callable,
             enable_cancel: Callable,
-            update_progress: Callable, 
+            update_progress: Callable,
             update_status: Callable,
             kind: str = "dl"
     ) -> DownloadJob | None:
 
         encoder = self._settings.get_encoder(scope)
-        
+
         job = DownloadJob(
             url=data.get("url", ""),
             mode=data.get("mode", ""),
@@ -96,19 +85,35 @@ class DownloadController:
         if not self._validate_data(job):
             return None
 
+        return job
+    
+    def download_requested(
+            self, 
+            data: dict, 
+            path: str,
+            scope: str,
+            enable_download: Callable,
+            enable_cancel: Callable,
+            update_progress: Callable, 
+            update_status: Callable,
+            kind: str = "dl"
+    ) -> DownloadJob | None:
+
+        job = self.create_job(
+            data, path, scope,
+            enable_download, enable_cancel, update_progress, update_status,
+            kind,
+        )
+        if not job:
+            return None
+
         job.on_download_enabled(False)
         job.on_cancel_enabled(True)
         job.on_progress(0)
-        job.on_status("Waiting in queue")
+        job.on_status("Downloading")
 
-        # threading.Thread(target=target, args=(job,), daemon=True).start()
-        if not self._queue.add_job(job):
-            job.log.warning("Queue Full, job refused")
-            job.on_status("Queue is full, try again later")
-            job.on_cancel_enabled(False)
-            job.on_download_enabled(True)
-            return None
-    
+        threading.Thread(target=self._run_home_job, args=(job,), daemon=True).start()
+
         return job
 
     def cancel_download(self, job: DownloadJob):
@@ -116,28 +121,18 @@ class DownloadController:
         job.log.info("Cancel Requested")
         job.on_status("Cancellation requested.....")
 
-    # Private Methods
-    def _validate_data(self, job: DownloadJob) -> bool:
-        custom_error_msg = DownloadValidator.validate(job.url, job.mode, job.out_dir)
-        if custom_error_msg:
-            job.log.info('Input Validation Failed:-"%s"', custom_error_msg)            
-            job.on_status(custom_error_msg)
-            return False
+    def run_download(self, job: DownloadJob) -> bool:
+        if job.mode == "mp4":
+            needs_transcode = self._run_video_download(job)
+        else:
+            needs_transcode = self._run_audio_download(job)
 
-        try:
-            os.makedirs(job.out_dir, exist_ok=True)
-        except OSError as e:
-            job.log.warning('out_dir Failure:-%s error="%s"', job.out_dir, e)            
-            job.on_status("Error: Can't use that folder")
-            return False
-        
-        return True
+        if not needs_transcode:
+            self._finish_job(job)
 
-    def _run_download(self, job: DownloadJob):
-        job.on_status("Downloading")
-        self._run_video_download(job) if job.mode == "mp4" else self._run_audio_download(job)
+        return needs_transcode
 
-    def _run_transcode(self, job: DownloadJob):
+    def run_transcode(self, job: DownloadJob):
         try:
             saved = [file for file in job.finished_files if os.path.exists(file)]
 
@@ -156,10 +151,28 @@ class DownloadController:
         finally:
             self._finish_job(job)
 
-    def _on_job_skipped(self, job: DownloadJob):
-        job.log.info("Cancelled While Waiting")
-        self._finish_job(job)
-    
+    # Private Methods
+    def _validate_data(self, job: DownloadJob) -> bool:
+        custom_error_msg = DownloadValidator.validate(job.url, job.mode, job.out_dir)
+        if custom_error_msg:
+            job.log.info('Input Validation Failed:-"%s"', custom_error_msg)            
+            job.on_status(custom_error_msg)
+            return False
+
+        try:
+            os.makedirs(job.out_dir, exist_ok=True)
+        except OSError as e:
+            job.log.warning('out_dir Failure:-%s error="%s"', job.out_dir, e)            
+            job.on_status("Error: Can't use that folder")
+            return False
+        
+        return True
+
+    def _run_home_job(self, job: DownloadJob):
+        needs_transcode = self.run_download(job)
+        if needs_transcode:
+            self.run_transcode(job)
+
     def _run_audio_download(self, job: DownloadJob):
         try:
             url, folder_path = self._prepare_target(job)
@@ -187,8 +200,7 @@ class DownloadController:
             if not job.cancel.is_set():
                 self._report_error(e, job)
 
-        finally:
-            self._finish_job(job)
+        return False
 
     def _run_video_download(self, job: DownloadJob):
         try:
@@ -210,18 +222,18 @@ class DownloadController:
 
                 if not saved:
                     self._report_nothing_saved(job, collector)
-                else:
-                    job.failed_count = self._count_failures(job, collector, len(saved))
-                    job.on_status("Waiting for transcode")
-                    handed_off = self._queue.handover_to_transcode(job)
+                    return False
+
+                job.failed_count = self._count_failures(job, collector, len(saved))
+                return True
 
         except Exception as e:
             if not job.cancel.is_set():
                 self._report_error(e, job)
 
-        finally:
-            if not handed_off:
-                self._finish_job(job)
+            return False
+        
+        return False
 
     def _finish_job(self, job: DownloadJob):
         cancelled = job.cancel.is_set()

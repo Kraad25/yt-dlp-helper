@@ -253,12 +253,23 @@ class SettingsView(BaseView):
         return encoder_menu, redetect_button
 
     def _create_download_queue_section(self, parent):
+
         self._add_heading(parent, row=3, title="Download Queue")
+        hint = customtkinter.CTkLabel(
+            parent,
+            text="(Changes are applied after restart)",
+            font=customtkinter.CTkFont(size=12, slant="italic"),
+            text_color="gray50",
+        )
+        hint.grid(row=3, column=1, sticky="e", padx=(0, 10), pady=(3, 0))
+
+        self._create_fixed_row(parent, row=4, label_text="Home download workers", value_text="1 (fixed)")
+        self._create_fixed_row(parent, row=5, label_text="Home transcode workers", value_text="1 (fixed)")
 
         self._create_limit_row(
             parent, 
-            row=4, 
-            label_text="Parallel downloads", 
+            row=6, 
+            label_text="Explore download workers", 
             variable=self._parallel_downloads_var, 
             values=self.PARALLEL_DOWNLOAD_CHOICES, 
             command=self._on_parallel_downloads_changed,
@@ -266,8 +277,8 @@ class SettingsView(BaseView):
 
         self._create_limit_row(
             parent, 
-            row=5, 
-            label_text="Parallel transcodes", 
+            row=7, 
+            label_text="Explore transcode workers", 
             variable=self._parallel_transcodes_var, 
             values=self.PARALLEL_TRANSCODING_CHOICES, 
             command=self._on_parallel_transcodes_changed,
@@ -275,8 +286,8 @@ class SettingsView(BaseView):
 
         self._create_limit_row(
             parent, 
-            row=6, 
-            label_text="Queue limit", 
+            row=8, 
+            label_text="Explore Queue limit", 
             variable=self._queue_limit_var, 
             values=self.DOWNLOAD_QUEUE_LIMIT_CHOICES, 
             command=self._on_queue_limit_changed,
@@ -338,6 +349,17 @@ class SettingsView(BaseView):
         menu.grid(row=row, column=1, sticky="e", padx=(0, 10))
 
         return menu
+
+    def _create_fixed_row(self, parent, row, label_text, value_text):
+        self._add_setting_label(parent, row, label_text)
+
+        value_label = customtkinter.CTkLabel(
+            parent,
+            text=value_text,
+            font=customtkinter.CTkFont(size=12),
+            text_color="gray50",
+        )
+        value_label.grid(row=row, column=1, sticky="e", padx=(0, 10))
 
     def _create_placeholder_page(self, parent, name: str):
         page = customtkinter.CTkFrame(parent, fg_color="transparent")

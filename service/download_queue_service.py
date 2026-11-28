@@ -7,13 +7,14 @@ from core.job_logger import JobLogger
 log = JobLogger("queue")
 
 class WorkLine:
-    def __init__(self, name: str, worker_count: int, handler: Callable, on_skipped: Callable, limit: int | None = None):
+    def __init__(self, name: str, worker_count: int, handler: Callable, on_skipped: Callable, limit: int | None = None, on_queue_update: Callable | None = None):
 
         self._name = name
         self._worker_count = worker_count
         self._handler = handler
         self._on_skipped = on_skipped
         self._limit = limit
+        self._on_queue_update = on_queue_update
 
         self._waiting = deque()
         self._running = 0
@@ -35,7 +36,9 @@ class WorkLine:
             self._waiting.append(job)
             log.info("Job Queued Id:%s Line:%s Waiting:%s", job.log.job_id, self._name, len(self._waiting))
             self._queue_lock.notify() # Notify a worker
-            return True
+
+        self._send_queue_update()
+        return True
 
     def get_position_of(self, job) -> int:
         with self._queue_lock:
@@ -52,6 +55,14 @@ class WorkLine:
         with self._queue_lock:
             return self._running
 
+    def _send_queue_update(self):
+        if not self._on_queue_update:
+            return
+        try:
+            self._on_queue_update()
+        except Exception as e:
+            log.error('Queue Update Callback Crashed Line:%s Error:"%s"', self._name, e)
+
     # Private Methods
     def _take(self):
         with self._queue_lock:
@@ -60,7 +71,9 @@ class WorkLine:
 
             job = self._waiting.popleft() # FIFO
             self._running += 1
-            return job
+
+        self._send_queue_update()    
+        return job
 
     def _worker_loop(self, worker_id: int):
         log.info("Worker Started Line:%s Id:%s", self._name, worker_id)
@@ -82,11 +95,27 @@ class WorkLine:
                 with self._queue_lock:
                     self._running -= 1
 
-class DownloadQueue:
-    def __init__(self, download_workers:int, transcode_workers:int, queue_limit:int, run_download:Callable, run_transcode:Callable, on_skipped:Callable):
+                self._send_queue_update()
 
-        self._download_line = WorkLine("download", download_workers, run_download, on_skipped, limit=queue_limit)
-        self._transcode_line = WorkLine("transcode", transcode_workers, run_transcode, on_skipped)
+class DownloadQueue:
+    def __init__(self, download_workers:int, transcode_workers:int, queue_limit:int, run_download:Callable, run_transcode:Callable, on_skipped:Callable, on_queue_update:Callable):
+        self._download_line = WorkLine(
+            name="download", 
+            worker_count=download_workers, 
+            handler=run_download, 
+            on_skipped=on_skipped, 
+            limit=queue_limit, 
+            on_queue_update=on_queue_update
+        )
+
+        self._transcode_line = WorkLine(
+            name="transcode", 
+            worker_count=transcode_workers, 
+            handler=run_transcode,
+            limit=None,
+            on_skipped=on_skipped,
+            on_queue_update=on_queue_update
+        )
 
     def start_workers(self):
         self._download_line.start_worker_loop()
